@@ -99,6 +99,43 @@ const horarioEstaBloqueado = async (profissional, data, horario) => {
   return false;
 };
 
+// ==========================================
+// ENVIO DE WHATSAPP VIA CALLMEBOT
+// ==========================================
+const enviarWhatsApp = async (agendamento) => {
+  // Só envia se as variáveis estiverem configuradas
+  if (!process.env.WHATSAPP_NUMERO || !process.env.WHATSAPP_APIKEY) {
+    console.log('⚠️ WhatsApp não configurado - pulando notificação');
+    return;
+  }
+
+  const dataFormatada = new Date(agendamento.data + 'T00:00:00').toLocaleDateString('pt-BR', {
+    day: 'numeric', month: 'numeric', year: 'numeric'
+  });
+
+  const mensagem = `*NOVO AGENDAMENTO!* 🎉\n\n` +
+    `👤 *Cliente:* ${agendamento.nomeCliente}\n` +
+    `📞 *Tel:* ${agendamento.telefone}\n` +
+    `💈 *Serviço:* ${agendamento.servico}\n` +
+    `👤 *Profissional:* ${agendamento.profissional}\n` +
+    `📅 *Data:* ${dataFormatada}\n` +
+    `⏰ *Horário:* ${agendamento.horario}\n` +
+    `💰 *Valor:* R$ ${agendamento.preco}`;
+
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${process.env.WHATSAPP_NUMERO}&text=${encodeURIComponent(mensagem)}&apikey=${process.env.WHATSAPP_APIKEY}`;
+
+  try {
+    const resposta = await fetch(url);
+    if (resposta.ok) {
+      console.log('📱 WhatsApp enviado com sucesso!');
+    } else {
+      console.log('⚠️ Erro ao enviar WhatsApp:', await resposta.text());
+    }
+  } catch (e) {
+    console.log('⚠️ Falha na conexão com CallMeBot:', e.message);
+  }
+};
+
 // ===== ROTAS PÚBLICAS =====
 
 // Dados do salão
@@ -168,6 +205,10 @@ app.post('/api/agendamentos', async (req, res) => {
     }
 
     const agendamento = await Appointment.create(req.body);
+
+        // ===== ENVIA WHATSAPP AUTOMATICAMENTE =====
+    enviarWhatsApp(agendamento);
+
     res.status(201).json(agendamento);
   } catch (e) {
     if (e.code === 11000) return res.status(400).json({ erro: 'Horário já reservado' });
