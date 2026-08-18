@@ -61,9 +61,7 @@ export default function Login() {
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13 }}>
           <a href="/" style={{ color: '#666' }}>← Voltar ao agendamento</a>
         </p>
-        <p style={{ textAlign: 'center', marginTop: 40, fontSize: 12, color: '#999' }}>
-          Usuário padrão: admin / salao2026
-        </p>
+      
       </div>
     </>
   );
