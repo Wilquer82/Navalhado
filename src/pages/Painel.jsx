@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = process.env.REACT_APP_API || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
 const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
 export default function Painel() {
@@ -12,23 +12,21 @@ export default function Painel() {
   const [bloqueios, setBloqueios] = useState([]);
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0]);
   const [token] = useState(localStorage.getItem('token'));
+  const [linkCopiado, setLinkCopiado] = useState(false);
   const nav = useNavigate();
 
   // Formulários
   const [formProf, setFormProf] = useState({ nome: '', especialidade: '' });
   const [formServ, setFormServ] = useState({ nome: '', duracao: '', preco: '' });
   const [formBloq, setFormBloq] = useState({
-    profissional: '',
-    tipo: 'dia-semana',
-    data: '',
-    diaSemana: '0',
-    horarioInicio: '',
-    horarioFim: '',
-    motivo: ''
+    profissional: '', tipo: 'dia-semana', data: '',
+    diaSemana: '0', horarioInicio: '', horarioFim: '', motivo: ''
   });
   const [editandoProf, setEditandoProf] = useState(null);
   const [editandoServ, setEditandoServ] = useState(null);
   const [msg, setMsg] = useState('');
+
+  const linkSite = typeof window !== 'undefined' ? window.location.origin : '';
 
   useEffect(() => {
     if (aba === 'agendamentos') carregarAgendamentos();
@@ -65,11 +63,48 @@ export default function Painel() {
     setBloqueios(await res.json());
   };
 
+  // ===== COMPARTILHAR LINK =====
+  const compartilharLink = async () => {
+    const texto = `💈 Navalhado Cortes\nAgende seu horário online!`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Navalhado Cortes', text: texto, url: linkSite });
+      } catch (e) { console.log('Compartilhamento cancelado'); }
+    } else {
+      copiarLink();
+    }
+  };
+
+  const copiarLink = async () => {
+    try {
+      await navigator.clipboard.writeText(linkSite);
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2000);
+    } catch (e) { alert('Link: ' + linkSite); }
+  };
+
+  // ===== WHATSAPP =====
+  const enviarWhatsApp = agendamento => {
+    const dataFormatada = new Date(agendamento.data + 'T00:00:00').toLocaleDateString('pt-BR', {
+      weekday: 'long', day: 'numeric', month: 'long'
+    });
+    const mensagem = `Olá ${agendamento.nomeCliente}! 👋\n\n` +
+      `Confirmamos seu agendamento no Navalhado Cortes:\n\n` +
+      `💈 Serviço: ${agendamento.servico}\n` +
+      `👤 Profissional: ${agendamento.profissional}\n` +
+      `📅 Data: ${dataFormatada}\n` +
+      `⏰ Horário: ${agendamento.horario}\n` +
+      `💰 Valor: R$ ${agendamento.preco}\n\n` +
+      `Aguardamos você! 💈✨`;
+    const telefone = agendamento.telefone.replace(/\D/g, '');
+    const url = `https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, '_blank');
+  };
+
   const cancelarAgendamento = async id => {
     if (!confirm('Cancelar este agendamento?')) return;
     await fetch(`${API}/agendamentos/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
     });
     carregarAgendamentos();
   };
@@ -153,11 +188,7 @@ export default function Painel() {
   const adicionarBloqueio = async e => {
     e.preventDefault();
     setMsg('');
-    
-    if (!formBloq.profissional) {
-      alert('Selecione um profissional');
-      return;
-    }
+    if (!formBloq.profissional) { alert('Selecione um profissional'); return; }
 
     const dados = {
       profissional: formBloq.profissional,
@@ -229,10 +260,23 @@ export default function Painel() {
   };
 
   return (
-    <>
+    <main>
       <div className="admin-header">
         <div><h2 style={{ fontSize: 18 }}>Painel Admin</h2></div>
-        <button onClick={sair}>Sair</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={compartilharLink} className="btn-compartilhar">
+            📤 Compartilhar
+          </button>
+          <button onClick={sair}>Sair</button>
+        </div>
+      </div>
+
+      {/* Link do site */}
+      <div className="link-site">
+        <span>🔗 {linkSite}</span>
+        <button onClick={copiarLink}>
+          {linkCopiado ? '✓ Copiado!' : 'Copiar'}
+        </button>
       </div>
 
       {/* Abas */}
@@ -276,6 +320,7 @@ export default function Painel() {
                     <div className="cliente">📞 {a.telefone}</div>
                     {a.observacoes && <div className="serv">📝 {a.observacoes}</div>}
                     <div className="actions">
+                      <button className="whats-btn" onClick={() => enviarWhatsApp(a)}>💬 WhatsApp</button>
                       <button className="cancel-btn" onClick={() => cancelarAgendamento(a._id)}>Cancelar</button>
                     </div>
                   </div>
@@ -322,7 +367,7 @@ export default function Painel() {
             <div key={p._id} className="appointment-item">
               <div className="top"><span className="prof">{p.nome}</span></div>
               <div className="cliente">🎯 {p.especialidade}</div>
-              <div className="actions" style={{ display: 'flex', gap: 8 }}>
+              <div className="actions">
                 <button onClick={() => editarProfissional(p)} style={{
                   background: '#e3f2fd', color: '#1565c0', border: 'none',
                   padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer'
@@ -378,7 +423,7 @@ export default function Painel() {
                 <span className="time">R$ {s.preco}</span>
               </div>
               <div className="cliente">⏱️ {s.duracao} minutos</div>
-              <div className="actions" style={{ display: 'flex', gap: 8 }}>
+              <div className="actions">
                 <button onClick={() => editarServico(s)} style={{
                   background: '#e3f2fd', color: '#1565c0', border: 'none',
                   padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer'
@@ -495,6 +540,6 @@ export default function Painel() {
           )}
         </div>
       )}
-    </>
+    </main>
   );
 }

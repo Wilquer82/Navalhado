@@ -6,7 +6,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 .app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #fff; }
-
 /* Header */
 .header {
   background: black;
@@ -16,7 +15,6 @@ body {
 }
 .header h1 { font-size: 20px; font-weight: 600; }
 .header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
-
 /* Steps indicator */
 .steps {
   display: flex;
@@ -45,7 +43,6 @@ body {
 }
 .step.active .dot { background: #2d2d2d; }
 .step.done .dot { background: #4caf50; }
-
 /* Cards */
 .card {
   background: #fff;
@@ -69,7 +66,6 @@ body {
 }
 .card .preco { color: #2d2d2d; font-weight: 600; }
 .card .duracao { color: #888; }
-
 /* Buttons */
 .btn {
   width: calc(100% - 24px);
@@ -90,7 +86,6 @@ body {
   color: #2d2d2d;
   border: 1px solid #ddd;
 }
-
 /* Form */
 .form-group { margin: 12px; }
 .form-group label {
@@ -109,7 +104,6 @@ body {
   font-family: inherit;
 }
 .form-group textarea { resize: vertical; min-height: 80px; }
-
 /* Time grid */
 .time-grid {
   display: grid;
@@ -128,7 +122,6 @@ body {
 }
 .time-btn.selected { background: #2d2d2d; color: #fff; border-color: #2d2d2d; }
 .time-btn.disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; border-color: #eee; }
-
 /* Date picker */
 .date-scroll {
   display: flex;
@@ -151,7 +144,6 @@ body {
 .date-item .dia { font-size: 11px; text-transform: uppercase; }
 .date-item .num { font-size: 20px; font-weight: 600; margin: 4px 0; }
 .date-item .mes { font-size: 11px; }
-
 /* Summary */
 .summary {
   background: #fafafa;
@@ -173,7 +165,6 @@ body {
   font-weight: 600;
   font-size: 16px;
 }
-
 /* Success */
 .success {
   text-align: center;
@@ -192,7 +183,6 @@ body {
 }
 .success h2 { font-size: 22px; margin-bottom: 8px; }
 .success p { color: #666; margin-bottom: 24px; }
-
 /* Painel admin */
 .admin-header {
   background:black;
@@ -226,7 +216,7 @@ body {
 .appointment-item .time { color: #2d2d2d; font-weight: 600; }
 .appointment-item .cliente { font-size: 14px; color: #555; }
 .appointment-item .serv { font-size: 13px; color: #888; margin-top: 4px; }
-.appointment-item .actions { margin-top: 10px; }
+.appointment-item .actions { margin-top: 10px; display: flex; gap: 8px; }
 .appointment-item .cancel-btn {
   background: #ffebee;
   color: #c62828;
@@ -236,21 +226,27 @@ body {
   font-size: 12px;
   cursor: pointer;
 }
-
+.appointment-item .whats-btn {
+  background: #25d366;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
 .section-title {
   font-size: 15px;
   font-weight: 600;
   padding: 16px 16px 8px;
   color: #555;
 }
-
 .link-admin {
   text-align: center;
   padding: 20px;
   font-size: 12px;
 }
 .link-admin a { color: #999; text-decoration: none; }
-
 /* Logo no header */
 .logo-container {
   display: flex;
@@ -276,7 +272,6 @@ body {
   opacity: 0.85;
   margin: 2px 0 0 0;
 }
-
 /* Ajustes para telas muito pequenas */
 @media (max-width: 360px) {
   .logo-img {
@@ -286,4 +281,43 @@ body {
   .logo-nome {
     font-size: 16px;
   }
+}
+/* Link do site no painel */
+.link-site {
+  background: #e3f2fd;
+  padding: 12px;
+  margin: 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.link-site span {
+  font-size: 13px;
+  color: #1565c0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.link-site button {
+  background: #1565c0;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-compartilhar {
+  background: #25d366 !important;
+  color: #fff !important;
+  border: none !important;
+  padding: 6px 12px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
 }

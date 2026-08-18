@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = process.env.REACT_APP_API || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
 
 export default function Login() {
   const [usuario, setUsuario] = useState('');
@@ -9,26 +9,22 @@ export default function Login() {
   const [erro, setErro] = useState('');
   const nav = useNavigate();
 
- const entrar = async e => {
-  e.preventDefault();
-  console.log('Tentando login...');
-  const res = await fetch(`${API}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ usuario, senha })
-  });
-  const dado = await res.json();
-  console.log('Resposta:', res.status, dado);
-  
-  if (res.ok) {
-    localStorage.setItem('token', dado.token);
-    console.log('Token salvo:', dado.token);
-    // Força a navegação e recarrega a página para atualizar o estado
-    window.location.href = '/painel';
-  } else {
-    setErro(dado.erro || 'Falha no login');
-  }
-};
+  const entrar = async e => {
+    e.preventDefault();
+    const res = await fetch(`${API}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, senha })
+    });
+    const dado = await res.json();
+    
+    if (res.ok) {
+      localStorage.setItem('token', dado.token);
+      window.location.href = '/painel';
+    } else {
+      setErro(dado.erro || 'Falha no login');
+    }
+  };
 
   return (
     <>
@@ -36,7 +32,7 @@ export default function Login() {
         <div className="logo-container">
           <img 
             src="/Logo.webp" 
-            alt="Logo Salão Beleza & Cia" 
+            alt="Logo Navalhado Cortes" 
             className="logo-img"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
@@ -44,8 +40,10 @@ export default function Login() {
           <p className="logo-subtitulo">Acesso restrito à equipe</p>
         </div>
       </div>
+
       <div style={{ padding: '20px' }}>
         {erro && <p style={{ color: '#c62828', textAlign: 'center', marginBottom: 16 }}>{erro}</p>}
+        
         <form onSubmit={entrar}>
           <div className="form-group" style={{ margin: '0 0 16px 0' }}>
             <label>Usuário</label>
@@ -59,6 +57,7 @@ export default function Login() {
             Entrar
           </button>
         </form>
+
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13 }}>
           <a href="/" style={{ color: '#666' }}>← Voltar ao agendamento</a>
         </p>

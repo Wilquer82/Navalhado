@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 
 export default function Sobre() {
   const telefone = '(19) 99985-2402';
-  const endereco = 'R. Elvira Alves da Silva , Aguas de Lindoia - SP';
-
+  const endereco = 'R. Elvira Alves da Silva, Águas de Lindóia - SP';
 
   const horarios = [
     { dia: 'Segunda-feira', horario: '08:00 - 18:00' },
@@ -22,7 +21,7 @@ export default function Sobre() {
         <div className="logo-container">
           <img 
             src="/Logo.webp" 
-            alt="Logo Salão Beleza & Cia" 
+            alt="Logo Navalhado Cortes" 
             className="logo-img"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
@@ -47,8 +46,8 @@ export default function Sobre() {
           Sobre nós
         </h2>
         <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6 }}>
-            Seja bem vindo a Agenda Navalhado Cortes. Escolha o seu melhor horário, 
-            Não fique de Fora dessa grande experiencia. Deus te Abençoe sempre!!
+          Seja bem-vindo à Agenda Navalhado Cortes. Escolha o seu melhor horário, 
+          não fique de fora dessa grande experiência. Deus te abençoe sempre!!
         </p>
         <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, marginTop: 12 }}>
           Aqui você encontra cortes modernos, colorações vibrantes, tratamentos 
@@ -66,15 +65,8 @@ export default function Sobre() {
             display: 'flex', justifyContent: 'space-between',
             padding: '10px 0', borderBottom: i < horarios.length - 1 ? '1px solid #eee' : 'none'
           }}>
-            <span style={{ fontSize: 14, color: h.destaque ? '#c62828' : '#333' }}>
-              {h.dia}
-            </span>
-            <span style={{ 
-              fontSize: 14, fontWeight: 500,
-              color: h.destaque ? '#c62828' : '#2d2d2d'
-            }}>
-              {h.horario}
-            </span>
+            <span style={{ fontSize: 14, color: '#333' }}>{h.dia}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: '#2d2d2d' }}>{h.horario}</span>
           </div>
         ))}
       </div>

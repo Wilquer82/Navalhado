@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const API = process.env.REACT_APP_API || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
 
 export default function Agendar() {
   const [step, setStep] = useState(1);
@@ -112,8 +112,16 @@ export default function Agendar() {
     return (
       <div className="success">
         <div className="header">
-          <h1>Salão Beleza & Cia</h1>
-          <p>Agendamento Online</p>
+          <div className="logo-container">
+            <img 
+              src="/Logo.webp" 
+              alt="Logo Navalhado Cortes" 
+              className="logo-img"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <h1 className="logo-nome">Navalhado Cortes</h1>
+            <p className="logo-subtitulo">Agendamento Online</p>
+          </div>
         </div>
         <div className="icon">✓</div>
         <h2>Agendamento confirmado!</h2>
@@ -131,16 +139,16 @@ export default function Agendar() {
 
   return (
     <>
-<div className="header">
-  <div className="logo-container">
-    <img 
-      src="/Logo.webp" 
-      alt="Logo Salão Beleza & Cia" 
-      className="logo-img"
-      onError={(e) => { e.target.style.display = 'none'; }}
-    />
-  </div>
-</div>
+      <div className="header">
+        <div className="logo-container">
+          <img 
+            src="/Logo.webp" 
+            alt="Logo Navalhado Cortes" 
+            className="logo-img"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        </div>
+      </div>
 
       <div className="steps">
         <div className={`step ${step >= 1 ? (step > 1 ? 'done' : 'active') : ''}`}>
@@ -166,7 +174,7 @@ export default function Agendar() {
         <>
           <div className="section-title">Escolha o profissional</div>
           {profissionais.map(p => (
-            <div key={p.id} className="card" onClick={() => selecionarProfissional(p)}>
+            <div key={p._id || p.id} className="card" onClick={() => selecionarProfissional(p)}>
               <h3>{p.nome}</h3>
               <p>{p.especialidade}</p>
             </div>
@@ -179,7 +187,7 @@ export default function Agendar() {
         <>
           <div className="section-title">Escolha o serviço</div>
           {servicos.map(s => (
-            <div key={s.id} className="card" onClick={() => selecionarServico(s)}>
+            <div key={s._id || s.id} className="card" onClick={() => selecionarServico(s)}>
               <h3>{s.nome}</h3>
               <div className="meta">
                 <span className="preco">R$ {s.preco}</span>
@@ -276,18 +284,18 @@ export default function Agendar() {
         </form>
       )}
 
-    <div style={{ 
-      display: 'flex', justifyContent: 'center', gap: 20, 
-      padding: '20px', fontSize: 12 
+      <div style={{ 
+        display: 'flex', justifyContent: 'center', gap: 20, 
+        padding: '20px', fontSize: 12 
       }}>
-      <a href="/sobre" style={{ color: '#999', textDecoration: 'none' }}>
-        ℹ️ Sobre o salão
-      </a>
-      <span style={{ color: '#ddd' }}>|</span>
-      <a href="/login" style={{ color: '#999', textDecoration: 'none' }}>
-        🔐 Área dos profissionais
-      </a>
-    </div>
+        <a href="/sobre" style={{ color: '#999', textDecoration: 'none' }}>
+          ℹ️ Sobre o salão
+        </a>
+        <span style={{ color: '#ddd' }}>|</span>
+        <a href="/login" style={{ color: '#999', textDecoration: 'none' }}>
+          🔐 Área dos profissionais
+        </a>
+      </div>
     </>
   );
 }
