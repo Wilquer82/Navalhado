@@ -37,6 +37,31 @@ const criarDadosPadrao = async () => {
     console.log('🔑 Usuário criado: admin / salao2026');
   }
 
+  app.use((req, res, next) => {
+  const origensPermitidas = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://navalhado.netlify.app',   // SEU FRONTEND AQUI!
+    'https://navalhado.onrender.com'    // SE PRECISAR
+  ];
+
+  const origem = req.headers.origin;
+  if (origensPermitidas.includes(origem) || !origem) {
+    res.setHeader('Access-Control-Allow-Origin', origem || '*');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // Responde imediatamente às requisições OPTIONS (preflight)
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
   const countProf = await Profissional.countDocuments();
   if (countProf === 0) {
     await Profissional.insertMany([
@@ -332,11 +357,25 @@ app.delete('/api/bloqueios/:id', auth, async (req, res) => {
 });
 
 if (process.env.NODE_ENV === 'production') {
-  setInterval(() => {
-    fetch(`https://seu-backend.onrender.com/api/dados`)
-      .then(() => console.log('🔄 Ping — servidor acordado'))
-      .catch(() => {});
-  }, 4 * 60 * 1000); // 4 minutos
+  const URL_API = process.env.PING_URL || 'https://navalhado-backend.onrender.com/api/profissionais';
+  
+  const pingar = async () => {
+    try {
+      await fetch(URL_API, { 
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      console.log('🔄 Ping OK — servidor acordado');
+    } catch (e) {
+      console.log('⚠️ Ping:', e.message);
+    }
+  };
+
+  // Pinga a cada 3 MINUTOS (mais eficaz que 4 min)
+  setInterval(pingar, 3 * 60 * 1000);
+  
+  // Faz o PRIMEIRO ping logo ao iniciar
+  setTimeout(pingar, 10000);
 }
 
 const PORTA = process.env.PORT || 5000;
