@@ -331,5 +331,13 @@ app.delete('/api/bloqueios/:id', auth, async (req, res) => {
   res.json({ ok: true });
 });
 
+if (process.env.NODE_ENV === 'production') {
+  setInterval(() => {
+    fetch(`https://seu-backend.onrender.com/api/dados`)
+      .then(() => console.log('🔄 Ping — servidor acordado'))
+      .catch(() => {});
+  }, 4 * 60 * 1000); // 4 minutos
+}
+
 const PORTA = process.env.PORT || 5000;
 app.listen(PORTA, () => console.log(`🚀 API na porta ${PORTA}`));
