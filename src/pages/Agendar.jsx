@@ -45,6 +45,31 @@ export default function Agendar() {
     setDatas(arr);
   };
 
+  const carregarProfissionais = async () => {
+  try {
+    // Tenta usar cache primeiro
+    const cache = localStorage.getItem('profissionaisCache');
+    const cacheTempo = localStorage.getItem('profissionaisCacheTime');
+    const AGORA = Date.now();
+    
+    // Usa cache se tiver menos de 10 minutos
+    if (cache && cacheTempo && (AGORA - Number(cacheTempo)) < 10 * 60 * 1000) {
+      setProfissionais(JSON.parse(cache));
+    }
+
+    // Sempre busca atualizado em segundo plano
+    const res = await fetch(`${API}/profissionais`);
+    const dados = await res.json();
+    setProfissionais(dados);
+    
+    // Salva no cache
+    localStorage.setItem('profissionaisCache', JSON.stringify(dados));
+    localStorage.setItem('profissionaisCacheTime', AGORA.toString());
+  } catch (e) {
+    console.log('Erro ao carregar:', e);
+  }
+};
+
   // Carregar horários ocupados ao selecionar data/profissional
   useEffect(() => {
     if (dataSel && dados.profissional) {
