@@ -7,22 +7,33 @@ export default function Login() {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
   const nav = useNavigate();
 
   const entrar = async e => {
     e.preventDefault();
-    const res = await fetch(`${API}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usuario, senha })
-    });
-    const dado = await res.json();
-    
-    if (res.ok) {
+    setErro('');
+    setCarregando(true);
+    try {
+      const res = await fetch(`${API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, senha })
+      });
+      const dado = await res.json();
+
+      if (!res.ok) {
+        setErro(dado.erro || 'Falha no login');
+        return;
+      }
+
+      if (!dado.token) throw new Error('Resposta de login inválida.');
       localStorage.setItem('token', dado.token);
-      window.location.href = '/painel';
-    } else {
-      setErro(dado.erro || 'Falha no login');
+      nav('/painel', { replace: true });
+    } catch (e) {
+      setErro(e.message || 'Não foi possível conectar ao servidor.');
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -53,8 +64,8 @@ export default function Login() {
             <label>Senha</label>
             <input type="password" value={senha} onChange={e => setSenha(e.target.value)} required />
           </div>
-          <button type="submit" className="btn" style={{ width: '100%', margin: 0 }}>
-            Entrar
+          <button type="submit" className="btn" style={{ width: '100%', margin: 0 }} disabled={carregando}>
+            {carregando ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
 

@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 
 const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
 
+const dataLocalISO = data => {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+};
+
 export default function Agendar() {
   const [step, setStep] = useState(1);
   const [dados, setDados] = useState({});
@@ -14,9 +21,12 @@ export default function Agendar() {
   const [sucesso, setSucesso] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [carregandoProfissionais, setCarregandoProfissionais] = useState(true);
+  const [erroAgendamento, setErroAgendamento] = useState('');
 
   // Carregar dados iniciais
   useEffect(() => {
+    const controller = new AbortController();
+
     fetch(`${API}/dados`)
       .then(r => {
         if (!r.ok) throw new Error('Falha ao carregar dados iniciais');
@@ -28,24 +38,26 @@ export default function Agendar() {
         setHorarios(d.horarios || []);
       })
       .catch(e => {
-        console.log('Erro ao carregar dados iniciais:', e);
+        if (e.name !== 'AbortError') console.log('Erro ao carregar dados iniciais:', e);
       })
       .finally(() => {
-        setCarregandoProfissionais(false);
+        if (!controller.signal.aborted) setCarregandoProfissionais(false);
       });
     gerarDatas();
+
+    return () => controller.abort();
   }, []);
 
-  // Gerar próximos 14 dias
+  // Gerar 14 dias de atendimento, distribuídos em duas semanas
   const gerarDatas = () => {
     const arr = [];
     const hoje = new Date();
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; arr.length < 14; i++) {
       const d = new Date(hoje);
       d.setDate(hoje.getDate() + i);
       if (d.getDay() !== 0) { // fecha domingo
         arr.push({
-          iso: d.toISOString().split('T')[0],
+            iso: dataLocalISO(d),
           dia: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
           num: d.getDate(),
           mes: d.toLocaleDateString('pt-BR', { month: 'short' })
@@ -55,42 +67,33 @@ export default function Agendar() {
     setDatas(arr);
   };
 
-  const carregarProfissionais = async () => {
-  try {
-    // Tenta usar cache primeiro
-    const cache = localStorage.getItem('profissionaisCache');
-    const cacheTempo = localStorage.getItem('profissionaisCacheTime');
-    const AGORA = Date.now();
-    
-    // Usa cache se tiver menos de 10 minutos
-    if (cache && cacheTempo && (AGORA - Number(cacheTempo)) < 10 * 60 * 1000) {
-      setProfissionais(JSON.parse(cache));
-    }
-
-    // Sempre busca atualizado em segundo plano
-    const res = await fetch(`${API}/profissionais`);
-    const dados = await res.json();
-    setProfissionais(dados);
-    
-    // Salva no cache
-    localStorage.setItem('profissionaisCache', JSON.stringify(dados));
-    localStorage.setItem('profissionaisCacheTime', AGORA.toString());
-  } catch (e) {
-    console.log('Erro ao carregar:', e);
-  }
-};
-
   // Carregar horários ocupados ao selecionar data/profissional
   useEffect(() => {
-    if (dataSel && dados.profissional) {
-      fetch(`${API}/horarios-ocupados?data=${dataSel}&profissional=${dados.profissional.nome}`)
-        .then(r => r.json())
-        .then(setOcupados);
-    }
+    setOcupados([]);
+    if (!dataSel || !dados.profissional) return undefined;
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      data: dataSel,
+      profissional: dados.profissional.nome
+    });
+
+    fetch(`${API}/horarios-ocupados?${params}`, { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error('Falha ao carregar horários');
+        return r.json();
+      })
+      .then(setOcupados)
+      .catch(e => {
+        if (e.name !== 'AbortError') console.log('Erro ao carregar horários:', e);
+      });
+
+    return () => controller.abort();
   }, [dataSel, dados.profissional]);
 
   const selecionarProfissional = p => {
-    setDados({ ...dados, profissional: p });
+    setDados({ profissional: p });
+    setDataSel('');
     setStep(2);
   };
 
@@ -115,25 +118,32 @@ export default function Agendar() {
   const confirmar = async e => {
     e.preventDefault();
     setCarregando(true);
-    const res = await fetch(`${API}/agendamentos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        profissional: dados.profissional.nome,
-        servico: dados.servico.nome,
-        duracao: dados.servico.duracao,
-        preco: dados.servico.preco,
-        data: dados.data,
-        horario: dados.horario,
-        nomeCliente: dados.nomeCliente,
-        telefone: dados.telefone,
-        email: dados.email || '',
-        observacoes: dados.observacoes || ''
-      })
-    });
-    setCarregando(false);
-    if (res.ok) setSucesso(true);
-    else alert('Erro ao agendar. Tente novamente.');
+    setErroAgendamento('');
+    try {
+      const res = await fetch(`${API}/agendamentos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profissional: dados.profissional.nome,
+          servico: dados.servico.nome,
+          duracao: dados.servico.duracao,
+          preco: dados.servico.preco,
+          data: dados.data,
+          horario: dados.horario,
+          nomeCliente: dados.nomeCliente,
+          telefone: dados.telefone,
+          email: dados.email || '',
+          observacoes: dados.observacoes || ''
+        })
+      });
+
+      if (!res.ok) throw new Error('Erro ao agendar. Tente novamente.');
+      setSucesso(true);
+    } catch (e) {
+      setErroAgendamento(e.message || 'Não foi possível concluir o agendamento.');
+    } finally {
+      setCarregando(false);
+    }
   };
 
   const reiniciar = () => {
@@ -141,6 +151,7 @@ export default function Agendar() {
     setDados({});
     setDataSel('');
     setSucesso(false);
+    setErroAgendamento('');
   };
 
   if (sucesso) {
@@ -310,6 +321,7 @@ export default function Agendar() {
       {step === 4 && (
         <form onSubmit={confirmar}>
           <div className="section-title">Confirme seus dados</div>
+          {erroAgendamento && <div className="form-error" role="alert">{erroAgendamento}</div>}
 
           <div className="summary">
             <h4>Resumo do agendamento</h4>

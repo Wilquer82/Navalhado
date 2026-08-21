@@ -4,13 +4,20 @@ import { useNavigate } from 'react-router-dom';
 const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
 const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
+const dataLocalISO = data => {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+};
+
 export default function Painel() {
   const [aba, setAba] = useState('agendamentos');
   const [agendamentos, setAgendamentos] = useState([]);
   const [profissionais, setProfissionais] = useState([]);
   const [servicos, setServicos] = useState([]);
   const [bloqueios, setBloqueios] = useState([]);
-  const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0]);
+  const [dataFiltro, setDataFiltro] = useState(dataLocalISO(new Date()));
   const [token] = useState(localStorage.getItem('token'));
   const [linkCopiado, setLinkCopiado] = useState(false);
   const nav = useNavigate();
@@ -40,27 +47,67 @@ export default function Painel() {
     'Authorization': `Bearer ${token}`
   };
 
+  const apiFetch = async (url, options = {}) => {
+    const res = await fetch(url, {
+      ...options,
+      headers: { ...headers, ...options.headers }
+    });
+    const texto = await res.text();
+    let dado = null;
+
+    if (texto) {
+      try { dado = JSON.parse(texto); } catch (e) { /* resposta sem JSON */ }
+    }
+
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      nav('/login', { replace: true });
+      throw new Error('Sua sessão expirou. Faça login novamente.');
+    }
+    if (!res.ok) throw new Error(dado?.erro || `Erro na operação (${res.status}).`);
+    return dado;
+  };
+
   const carregarAgendamentos = async () => {
-    let url = `${API}/agendamentos`;
-    if (dataFiltro) url += `?data=${dataFiltro}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status === 401) { localStorage.removeItem('token'); nav('/login'); return; }
-    setAgendamentos(await res.json());
+    try {
+      let url = `${API}/agendamentos`;
+      if (dataFiltro) url += `?data=${encodeURIComponent(dataFiltro)}`;
+      const dados = await apiFetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      setAgendamentos(Array.isArray(dados) ? dados : []);
+    } catch (e) {
+      setAgendamentos([]);
+      if (e.message) setMsg(e.message);
+    }
   };
 
   const carregarProfissionais = async () => {
-    const res = await fetch(`${API}/profissionais`, { headers: { Authorization: `Bearer ${token}` } });
-    setProfissionais(await res.json());
+    try {
+      const dados = await apiFetch(`${API}/profissionais`);
+      setProfissionais(Array.isArray(dados) ? dados : []);
+    } catch (e) {
+      setProfissionais([]);
+      if (e.message) setMsg(e.message);
+    }
   };
 
   const carregarServicos = async () => {
-    const res = await fetch(`${API}/servicos`, { headers: { Authorization: `Bearer ${token}` } });
-    setServicos(await res.json());
+    try {
+      const dados = await apiFetch(`${API}/servicos`);
+      setServicos(Array.isArray(dados) ? dados : []);
+    } catch (e) {
+      setServicos([]);
+      if (e.message) setMsg(e.message);
+    }
   };
 
   const carregarBloqueios = async () => {
-    const res = await fetch(`${API}/bloqueios`, { headers: { Authorization: `Bearer ${token}` } });
-    setBloqueios(await res.json());
+    try {
+      const dados = await apiFetch(`${API}/bloqueios`);
+      setBloqueios(Array.isArray(dados) ? dados : []);
+    } catch (e) {
+      setBloqueios([]);
+      if (e.message) setMsg(e.message);
+    }
   };
 
   // ===== COMPARTILHAR LINK =====
@@ -103,26 +150,33 @@ export default function Painel() {
 
   const cancelarAgendamento = async id => {
     if (!confirm('Cancelar este agendamento?')) return;
-    await fetch(`${API}/agendamentos/${id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
-    });
-    carregarAgendamentos();
+    try {
+      await apiFetch(`${API}/agendamentos/${id}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+      });
+      carregarAgendamentos();
+    } catch (e) { alert(e.message); }
   };
 
   // ===== PROFISSIONAIS =====
   const salvarProfissional = async e => {
     e.preventDefault();
     setMsg('');
-    if (editandoProf) {
-      await fetch(`${API}/profissionais/${editandoProf._id}`, {
-        method: 'PUT', headers, body: JSON.stringify(formProf)
-      });
-      setMsg('✅ Profissional atualizado!');
-    } else {
-      await fetch(`${API}/profissionais`, {
-        method: 'POST', headers, body: JSON.stringify(formProf)
-      });
-      setMsg('✅ Profissional adicionado!');
+    try {
+      if (editandoProf) {
+        await apiFetch(`${API}/profissionais/${editandoProf._id}`, {
+          method: 'PUT', body: JSON.stringify(formProf)
+        });
+        setMsg('✅ Profissional atualizado!');
+      } else {
+        await apiFetch(`${API}/profissionais`, {
+          method: 'POST', body: JSON.stringify(formProf)
+        });
+        setMsg('✅ Profissional adicionado!');
+      }
+    } catch (e) {
+      alert(e.message);
+      return;
     }
     setFormProf({ nome: '', especialidade: '' });
     setEditandoProf(null);
@@ -137,12 +191,10 @@ export default function Painel() {
 
   const excluirProfissional = async p => {
     if (!confirm(`Excluir ${p.nome}?`)) return;
-    const res = await fetch(`${API}/profissionais/${p._id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
-    });
-    const dado = await res.json();
-    if (!res.ok) alert(dado.erro);
-    else carregarProfissionais();
+    try {
+      await apiFetch(`${API}/profissionais/${p._id}`, { method: 'DELETE' });
+      carregarProfissionais();
+    } catch (e) { alert(e.message); }
   };
 
   // ===== SERVIÇOS =====
@@ -154,16 +206,21 @@ export default function Painel() {
       duracao: Number(formServ.duracao),
       preco: Number(formServ.preco)
     };
-    if (editandoServ) {
-      await fetch(`${API}/servicos/${editandoServ._id}`, {
-        method: 'PUT', headers, body: JSON.stringify(dados)
-      });
-      setMsg('✅ Serviço atualizado!');
-    } else {
-      await fetch(`${API}/servicos`, {
-        method: 'POST', headers, body: JSON.stringify(dados)
-      });
-      setMsg('✅ Serviço adicionado!');
+    try {
+      if (editandoServ) {
+        await apiFetch(`${API}/servicos/${editandoServ._id}`, {
+          method: 'PUT', body: JSON.stringify(dados)
+        });
+        setMsg('✅ Serviço atualizado!');
+      } else {
+        await apiFetch(`${API}/servicos`, {
+          method: 'POST', body: JSON.stringify(dados)
+        });
+        setMsg('✅ Serviço adicionado!');
+      }
+    } catch (e) {
+      alert(e.message);
+      return;
     }
     setFormServ({ nome: '', duracao: '', preco: '' });
     setEditandoServ(null);
@@ -178,10 +235,10 @@ export default function Painel() {
 
   const excluirServico = async s => {
     if (!confirm(`Excluir ${s.nome}?`)) return;
-    await fetch(`${API}/servicos/${s._id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
-    });
-    carregarServicos();
+    try {
+      await apiFetch(`${API}/servicos/${s._id}`, { method: 'DELETE' });
+      carregarServicos();
+    } catch (e) { alert(e.message); }
   };
 
   // ===== BLOQUEIOS =====
@@ -208,9 +265,14 @@ export default function Painel() {
       dados.horarioFim = formBloq.horarioFim;
     }
 
-    await fetch(`${API}/bloqueios`, {
-      method: 'POST', headers, body: JSON.stringify(dados)
-    });
+    try {
+      await apiFetch(`${API}/bloqueios`, {
+        method: 'POST', body: JSON.stringify(dados)
+      });
+    } catch (e) {
+      alert(e.message);
+      return;
+    }
 
     setMsg('✅ Bloqueio adicionado!');
     setFormBloq({
@@ -223,10 +285,10 @@ export default function Painel() {
 
   const excluirBloqueio = async b => {
     if (!confirm('Remover este bloqueio?')) return;
-    await fetch(`${API}/bloqueios/${b._id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
-    });
-    carregarBloqueios();
+    try {
+      await apiFetch(`${API}/bloqueios/${b._id}`, { method: 'DELETE' });
+      carregarBloqueios();
+    } catch (e) { alert(e.message); }
   };
 
   const sair = () => {
