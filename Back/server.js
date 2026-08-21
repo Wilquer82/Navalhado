@@ -11,14 +11,50 @@ const Servico = require('./models/Servico');
 const Bloqueio = require('./models/Bloqueio');
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+
+const origensPermitidas = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://navalhado.netlify.app',
+  'https://navalhado.onrender.com'
+];
+
+app.use(cors({
+  origin: (origem, callback) => {
+    if (!origem || origensPermitidas.includes(origem)) return callback(null, true);
+    return callback(new Error('Origem não permitida pelo CORS'));
+  },
+  credentials: true
+}));
 
 // Horários de funcionamento
 const HORARIOS = [
   '08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30',
   '14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30'
 ];
+
+const dataLocalISO = data => {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+};
+
+const validarAgendamento = dados => {
+  const camposObrigatorios = [
+    'profissional', 'servico', 'duracao', 'preco', 'data',
+    'horario', 'nomeCliente', 'telefone'
+  ];
+  if (camposObrigatorios.some(campo => dados[campo] === undefined || dados[campo] === null || dados[campo] === '')) {
+    return 'Preencha todos os campos obrigatórios.';
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dados.data)) return 'Data inválida.';
+  if (!HORARIOS.includes(dados.horario)) return 'Horário inválido.';
+  if (!Number.isFinite(Number(dados.duracao)) || Number(dados.duracao) <= 0) return 'Duração inválida.';
+  if (!Number.isFinite(Number(dados.preco)) || Number(dados.preco) < 0) return 'Preço inválido.';
+  return null;
+};
 
 // Conectar MongoDB
 mongoose.connect(process.env.MONGO_URI)
@@ -30,37 +66,18 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Criar dados padrão
 const criarDadosPadrao = async () => {
-  const existeUser = await User.findOne({ usuario: 'admin' });
-  if (!existeUser) {
-    const hash = await bcrypt.hash('salao2026', 10);
-    await User.create({ usuario: 'admin', senha: hash });
-    console.log('🔑 Usuário criado: admin / salao2026');
+  const adminUsuario = process.env.ADMIN_USER;
+  const adminSenha = process.env.ADMIN_PASSWORD;
+  if (adminUsuario && adminSenha) {
+    const existeUser = await User.findOne({ usuario: adminUsuario });
+    if (!existeUser) {
+      const hash = await bcrypt.hash(adminSenha, 10);
+      await User.create({ usuario: adminUsuario, senha: hash });
+      console.log(`🔑 Usuário administrativo criado: ${adminUsuario}`);
+    }
+  } else {
+    console.warn('⚠️ ADMIN_USER e ADMIN_PASSWORD não configurados; usuário padrão não será criado.');
   }
-
-  app.use((req, res, next) => {
-  const origensPermitidas = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://navalhado.netlify.app',   // SEU FRONTEND AQUI!
-    'https://navalhado.onrender.com'    // SE PRECISAR
-  ];
-
-  const origem = req.headers.origin;
-  if (origensPermitidas.includes(origem) || !origem) {
-    res.setHeader('Access-Control-Allow-Origin', origem || '*');
-  }
-
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  // Responde imediatamente às requisições OPTIONS (preflight)
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
-  next();
-});
 
   const countProf = await Profissional.countDocuments();
   if (countProf === 0) {
@@ -122,6 +139,12 @@ const horarioEstaBloqueado = async (profissional, data, horario) => {
     }
   }
   return false;
+};
+
+const horarioForaDoFuncionamento = (data, horario) => {
+  const diaSemana = new Date(data + 'T00:00:00').getDay();
+  const fimDeSemana = diaSemana === 0 || diaSemana === 6;
+  return fimDeSemana && horario > '14:00';
 };
 
 // ==========================================
@@ -219,6 +242,13 @@ app.get('/api/horarios-ocupados', async (req, res) => {
 // Criar agendamento
 app.post('/api/agendamentos', async (req, res) => {
   try {
+    const erroValidacao = validarAgendamento(req.body);
+    if (erroValidacao) return res.status(400).json({ erro: erroValidacao });
+
+    if (horarioForaDoFuncionamento(req.body.data, req.body.horario)) {
+      return res.status(400).json({ erro: 'Aos sábados e domingos, os agendamentos são aceitos até 14:00.' });
+    }
+
     // Verifica se o horário está bloqueado antes de agendar
     const bloqueado = await horarioEstaBloqueado(
       req.body.profissional, 
@@ -282,7 +312,8 @@ app.post('/api/profissionais', auth, async (req, res) => {
 
 app.put('/api/profissionais/:id', auth, async (req, res) => {
   try {
-    const prof = await Profissional.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const prof = await Profissional.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!prof) return res.status(404).json({ erro: 'Profissional não encontrado.' });
     res.json(prof);
   } catch (e) {
     res.status(400).json({ erro: e.message });
@@ -290,8 +321,9 @@ app.put('/api/profissionais/:id', auth, async (req, res) => {
 });
 
 app.delete('/api/profissionais/:id', auth, async (req, res) => {
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = dataLocalISO(new Date());
   const profissional = await Profissional.findById(req.params.id);
+  if (!profissional) return res.status(404).json({ erro: 'Profissional não encontrado.' });
   
   const temAgendamentosFuturos = await Appointment.findOne({
     profissional: profissional.nome,
@@ -325,7 +357,8 @@ app.post('/api/servicos', auth, async (req, res) => {
 
 app.put('/api/servicos/:id', auth, async (req, res) => {
   try {
-    const serv = await Servico.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const serv = await Servico.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!serv) return res.status(404).json({ erro: 'Serviço não encontrado.' });
     res.json(serv);
   } catch (e) {
     res.status(400).json({ erro: e.message });
