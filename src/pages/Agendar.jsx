@@ -13,15 +13,25 @@ export default function Agendar() {
   const [dataSel, setDataSel] = useState('');
   const [sucesso, setSucesso] = useState(false);
   const [carregando, setCarregando] = useState(false);
+  const [carregandoProfissionais, setCarregandoProfissionais] = useState(true);
 
   // Carregar dados iniciais
   useEffect(() => {
     fetch(`${API}/dados`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Falha ao carregar dados iniciais');
+        return r.json();
+      })
       .then(d => {
-        setProfissionais(d.profissionais);
-        setServicos(d.servicos);
-        setHorarios(d.horarios);
+        setProfissionais(d.profissionais || []);
+        setServicos(d.servicos || []);
+        setHorarios(d.horarios || []);
+      })
+      .catch(e => {
+        console.log('Erro ao carregar dados iniciais:', e);
+      })
+      .finally(() => {
+        setCarregandoProfissionais(false);
       });
     gerarDatas();
   }, []);
@@ -198,12 +208,18 @@ export default function Agendar() {
       {step === 1 && (
         <>
           <div className="section-title">Escolha o profissional</div>
-          {profissionais.map(p => (
-            <div key={p._id || p.id} className="card" onClick={() => selecionarProfissional(p)}>
-              <h3>{p.nome}</h3>
-              <p>{p.especialidade}</p>
-            </div>
-          ))}
+          {carregandoProfissionais ? (
+            <div className="loading">Carregando profissionais...</div>
+          ) : profissionais.length > 0 ? (
+            profissionais.map(p => (
+              <div key={p._id || p.id} className="card" onClick={() => selecionarProfissional(p)}>
+                <h3>{p.nome}</h3>
+                <p>{p.especialidade}</p>
+              </div>
+            ))
+          ) : (
+            <div className="loading">Nenhum profissional disponível.</div>
+          )}
         </>
       )}
 
