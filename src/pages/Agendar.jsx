@@ -48,21 +48,19 @@ export default function Agendar() {
     return () => controller.abort();
   }, []);
 
-  // Gerar 14 dias de atendimento, distribuídos em duas semanas
+  // Gerar 14 dias corridos, distribuídos em duas semanas
   const gerarDatas = () => {
     const arr = [];
     const hoje = new Date();
     for (let i = 0; arr.length < 14; i++) {
       const d = new Date(hoje);
       d.setDate(hoje.getDate() + i);
-      if (d.getDay() !== 0) { // fecha domingo
-        arr.push({
-            iso: dataLocalISO(d),
-          dia: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
-          num: d.getDate(),
-          mes: d.toLocaleDateString('pt-BR', { month: 'short' })
-        });
-      }
+      arr.push({
+        iso: dataLocalISO(d),
+        dia: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
+        num: d.getDate(),
+        mes: d.toLocaleDateString('pt-BR', { month: 'short' })
+      });
     }
     setDatas(arr);
   };
