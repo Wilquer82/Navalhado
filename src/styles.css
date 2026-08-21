@@ -227,6 +227,13 @@ body {
   color: #aaa;
   cursor: not-allowed;
 }
+.calendar-slot.past .calendar-event {
+  border-color: #e8e8e8;
+  border-left-color: #cfcfcf;
+  background: #f7f7f7;
+  color: #b5b5b5;
+  cursor: not-allowed;
+}
 /* Date picker */
 .date-scroll {
   display: grid;

@@ -113,6 +113,15 @@ export default function Agendar() {
     return ocupados.some(o => o.horario === h);
   };
 
+  const horarioPassado = h => {
+    if (dataSel !== dataLocalISO(new Date())) return false;
+    const [hora, minuto] = h.split(':').map(Number);
+    const agora = new Date();
+    return hora * 60 + minuto <= agora.getHours() * 60 + agora.getMinutes();
+  };
+
+  const horarioIndisponivel = h => horarioOcupado(h) || horarioPassado(h);
+
   const confirmar = async e => {
     e.preventDefault();
     setCarregando(true);
@@ -292,16 +301,16 @@ export default function Agendar() {
                 {horarios.map(h => (
                   <div
                     key={h}
-                    className={`calendar-slot ${horarioOcupado(h) ? 'occupied' : ''}`}
+                    className={`calendar-slot ${horarioOcupado(h) ? 'occupied' : ''} ${horarioPassado(h) ? 'past' : ''}`}
                   >
                     <span className="calendar-time">{h}</span>
                     <button
                       type="button"
                       className="calendar-event"
-                      disabled={horarioOcupado(h)}
-                      onClick={() => !horarioOcupado(h) && selecionarHorario(h)}
+                      disabled={horarioIndisponivel(h)}
+                      onClick={() => !horarioIndisponivel(h) && selecionarHorario(h)}
                     >
-                      {horarioOcupado(h) ? 'Indisponível' : 'Disponível'}
+                      {horarioIndisponivel(h) ? 'Indisponível' : 'Disponível'}
                     </button>
                   </div>
                 ))}
