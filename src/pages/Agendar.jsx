@@ -122,6 +122,11 @@ export default function Agendar() {
 
   const horarioIndisponivel = h => horarioOcupado(h) || horarioPassado(h);
 
+  const horarioDisponivelNoDia = h => {
+    const diaSemana = new Date(`${dataSel}T00:00:00`).getDay();
+    return diaSemana !== 0 && diaSemana !== 6 || h <= '14:00';
+  };
+
   const confirmar = async e => {
     e.preventDefault();
     setCarregando(true);
@@ -298,7 +303,7 @@ export default function Agendar() {
                 </span>
               </div>
               <div className="day-calendar" aria-label="Horários disponíveis">
-                {horarios.map(h => (
+                {horarios.filter(horarioDisponivelNoDia).map(h => (
                   <div
                     key={h}
                     className={`calendar-slot ${horarioOcupado(h) ? 'occupied' : ''} ${horarioPassado(h) ? 'past' : ''}`}
