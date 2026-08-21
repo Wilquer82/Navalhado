@@ -262,17 +262,30 @@ export default function Agendar() {
 
           {dataSel && (
             <>
-              <div className="section-title">Escolha o horário</div>
-              <div className="time-grid">
+              <div className="calendar-heading">
+                <div className="section-title">Escolha o horário</div>
+                <span>
+                  {new Date(`${dataSel}T00:00:00`).toLocaleDateString('pt-BR', {
+                    weekday: 'long', day: 'numeric', month: 'long'
+                  })}
+                </span>
+              </div>
+              <div className="day-calendar" aria-label="Horários disponíveis">
                 {horarios.map(h => (
-                  <button
+                  <div
                     key={h}
-                    className={`time-btn ${horarioOcupado(h) ? 'disabled' : ''}`}
-                    disabled={horarioOcupado(h)}
-                    onClick={() => !horarioOcupado(h) && selecionarHorario(h)}
+                    className={`calendar-slot ${horarioOcupado(h) ? 'occupied' : ''}`}
                   >
-                    {h}
-                  </button>
+                    <span className="calendar-time">{h}</span>
+                    <button
+                      type="button"
+                      className="calendar-event"
+                      disabled={horarioOcupado(h)}
+                      onClick={() => !horarioOcupado(h) && selecionarHorario(h)}
+                    >
+                      {horarioOcupado(h) ? 'Indisponível' : 'Disponível'}
+                    </button>
+                  </div>
                 ))}
               </div>
             </>

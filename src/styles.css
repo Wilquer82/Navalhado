@@ -104,24 +104,64 @@ body {
   font-family: inherit;
 }
 .form-group textarea { resize: vertical; min-height: 80px; }
-/* Time grid */
-.time-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  padding: 0 12px;
+/* Visualizacao diaria de horarios */
+.calendar-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 16px;
 }
-.time-btn {
-  padding: 12px 8px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+.calendar-heading .section-title { padding-bottom: 8px; }
+.calendar-heading > span {
+  color: #888;
+  font-size: 12px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.day-calendar {
+  margin: 0 12px 16px;
+  border-top: 1px solid #e5e5e5;
   background: #fff;
-  font-size: 14px;
-  cursor: pointer;
-  text-align: center;
 }
-.time-btn.selected { background: #2d2d2d; color: #fff; border-color: #2d2d2d; }
-.time-btn.disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; border-color: #eee; }
+.calendar-slot {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  min-height: 58px;
+  border-bottom: 1px solid #e5e5e5;
+}
+.calendar-time {
+  align-self: start;
+  padding: 10px 10px 0 0;
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+.calendar-event {
+  width: calc(100% - 10px);
+  min-height: 38px;
+  margin: 0 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid #c8d9f5;
+  border-left: 4px solid #4285f4;
+  border-radius: 4px;
+  background: #eaf2ff;
+  color: #24549a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.calendar-event:hover { background: #dceaff; }
+.calendar-slot.occupied .calendar-event {
+  border-color: #e5e5e5;
+  border-left-color: #bdbdbd;
+  background: #f5f5f5;
+  color: #aaa;
+  cursor: not-allowed;
+}
 /* Date picker */
 .date-scroll {
   display: flex;
