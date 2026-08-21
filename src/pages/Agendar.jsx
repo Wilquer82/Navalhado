@@ -209,7 +209,16 @@ export default function Agendar() {
         <>
           <div className="section-title">Escolha o profissional</div>
           {carregandoProfissionais ? (
-            <div className="loading">Carregando profissionais...</div>
+            <div className="loading-state" role="status" aria-live="polite">
+              <div className="loading-label">
+                Carregando profissionais
+                <span className="loading-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>
+              </div>
+              <div className="professional-skeletons" aria-hidden="true">
+                <div className="professional-skeleton"><span /><div><b /><em /></div></div>
+                <div className="professional-skeleton"><span /><div><b /><em /></div></div>
+              </div>
+            </div>
           ) : profissionais.length > 0 ? (
             profissionais.map(p => (
               <div key={p._id || p.id} className="card" onClick={() => selecionarProfissional(p)}>
