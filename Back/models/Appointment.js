@@ -1,19 +1,18 @@
 const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema({
-  profissional: { type: String, required: true },
-  servico: { type: String, required: true },
-  duracao: { type: Number, required: true },
-  preco: { type: Number, required: true },
-  data: { type: String, required: true },
-  horario: { type: String, required: true },
+  profissionalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Profissional', required: true },
+  servicoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Servico', required: true },
+  data: { type: Date, required: true },
+  horarioInicio: { type: String, required: true },
+  horarioFim: { type: String, required: true },
   nomeCliente: { type: String, required: true },
-  telefone: { type: String, required: true },
-  email: { type: String, default: '' },
-  observacoes: { type: String, default: '' },
-  status: { type: String, enum: ['ativo', 'cancelado', 'concluido'], default: 'ativo' }
+  telefoneCliente: { type: String, required: true },
+  status: { type: String, enum: ['pendente', 'confirmado', 'concluido', 'cancelado'], default: 'pendente' },
+  criadoEm: { type: Date, default: Date.now },
+  tokenConfirmacao: { type: String, unique: true, sparse: true }
 }, { timestamps: true });
 
-appointmentSchema.index({ profissional: 1, data: 1, horario: 1 }, { unique: true });
+appointmentSchema.index({ profissionalId: 1, data: 1, horarioInicio: 1 });
 
 module.exports = mongoose.model('Appointment', appointmentSchema);
