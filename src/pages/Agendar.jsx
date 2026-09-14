@@ -26,7 +26,7 @@ export default function Agendar() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(`${API}/dados`)
+    fetch(`${API}/profissionais`)
       .then(r => {
         if (!r.ok) throw new Error('Falha ao carregar dados iniciais');
         return r.json();

@@ -1,6 +1,6 @@
 # 💈 Navalhado Cortes - Sistema de Agendamento
 
-Sistema de agendamento online para salão de cabeleireiros, desenvolvido com React + Vite.
+Sistema de agendamento online para salão de cabeleireiros, desenvolvido com React, Vite, Express e MongoDB.
 
 ## 🚀 Como rodar o projeto
 
@@ -20,9 +20,28 @@ Edite o arquivo `.env` com a URL do seu backend:
 # Para desenvolvimento local:
 VITE_API=http://localhost:5000/api
 
-# Para produção:
-# VITE_API=https://navalhado.onrender.com/api
+# Para produção, use a URL pública da API:
+# VITE_API=https://SEU-BACKEND.onrender.com/api
 ```
+
+### Backend
+
+```bash
+cd Back
+npm install
+node server.js
+```
+
+Variáveis obrigatórias do backend:
+
+```env
+MONGO_URI=mongodb+srv://...
+JWT_SECRET=uma-chave-secreta
+CORS_ORIGINS=https://SEU-FRONTEND.netlify.app
+PUBLIC_API_URL=https://SEU-BACKEND.onrender.com
+```
+
+Para criar o primeiro acesso profissional automaticamente no primeiro deploy, configure também `PROFISSIONAL_EMAIL`, `PROFISSIONAL_PASSWORD`, `PROFISSIONAL_NOME` e `PROFISSIONAL_TELEFONE`. Serviços padrão são criados automaticamente quando a coleção está vazia.
 
 ### 3. Rodar em desenvolvimento
 ```bash
@@ -48,17 +67,15 @@ Os arquivos compilados ficarão na pasta `dist/`.
 - Página "Sobre Nós" com contato e horários
 - **PWA**: instala na tela inicial do celular como app nativo
 
-### Para Profissionais (área admin)
-- 📅 **Agendamentos**: Visualizar por data, agrupados por profissional
-- 💬 **WhatsApp**: Botão para enviar mensagem de confirmação ao cliente
-- 📤 **Compartilhar link**: Botão para compartilhar o site por WhatsApp/SMS
-- 👤 **Equipe**: Adicionar/editar/excluir profissionais
-- 💇 **Serviços**: Adicionar/editar/excluir serviços
-- 🚫 **Bloqueios**: Bloquear agenda por data específica ou dia da semana recorrente
+### Para Profissionais
+- 📅 Visualizar a agenda por data
+- ✅ Confirmar, concluir ou cancelar agendamentos
+- 🗓️ Cadastrar dia de folga
+- 📄 Exportar a agenda mensal em CSV
 
-## 🔑 Credenciais
-- **Usuário**: admin
-- **Senha**: salao2026
+## 🔑 Acesso profissional
+
+O login usa e-mail e senha definidos pelas variáveis `PROFISSIONAL_EMAIL` e `PROFISSIONAL_PASSWORD`. Não existem credenciais fixas no código.
 
 ## 📁 Estrutura do projeto
 ```

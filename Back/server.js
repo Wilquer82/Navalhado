@@ -32,7 +32,12 @@ const minutos = horario => {
   return hora * 60 + minuto;
 };
 const horario = total => `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-const dataValida = data => /^\d{4}-\d{2}-\d{2}$/.test(data) && !Number.isNaN(new Date(`${data}T12:00:00-03:00`).getTime());
+const dataValida = data => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return false;
+  const [ano, mes, dia] = data.split('-').map(Number);
+  const valor = new Date(`${data}T12:00:00-03:00`);
+  return valor.getFullYear() === ano && valor.getMonth() + 1 === mes && valor.getDate() === dia;
+};
 const dataBanco = data => new Date(`${data}T12:00:00-03:00`);
 const intervaloData = data => ({
   $gte: new Date(`${data}T00:00:00-03:00`),
@@ -149,7 +154,8 @@ app.post('/api/agendamentos', async (req, res) => {
     const { profissionalId, servicoId, data, horarioInicio, nomeCliente, telefoneCliente } = req.body;
     if (!profissionalId || !servicoId || !data || !horarioInicio || !nomeCliente || !telefoneCliente) return respostaErro(res, 400, 'Preencha todos os campos obrigatórios.');
     if (nomeCliente.trim().length < 3) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
-    if (!dataValida(data) || !/^\d{2}:\d{2}$/.test(horarioInicio)) return respostaErro(res, 400, 'Data ou horário inválido.');
+    if (!dataValida(data) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(horarioInicio)) return respostaErro(res, 400, 'Data ou horário inválido.');
+    if (String(telefoneCliente).replace(/\D/g, '').length < 10) return respostaErro(res, 400, 'Telefone inválido.');
     const profissional = await Profissional.findOne({ _id: profissionalId, ativo: true });
     if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
     const vinculo = await servicoDoProfissional(profissional, servicoId);
@@ -159,7 +165,8 @@ app.post('/api/agendamentos', async (req, res) => {
     const inicio = minutos(horarioInicio);
     const fim = inicio + vinculo.vinculo.duracaoMinutos;
     if (folga(profissional, data) || !expediente || inicio < minutos(expediente.inicio) || fim > minutos(expediente.fim)) return respostaErro(res, 400, 'Horário fora do expediente ou dia de folga.');
-    const conflito = await Appointment.findOne({ profissionalId, data: intervaloData(data), status: { $ne: 'cancelado' }, horarioInicio: { $lt: horario(fim + config.duracaoIntervaloEntre) }, horarioFim: { $gt: horarioInicio } });
+    const agendamentosDoDia = await Appointment.find({ profissionalId, data: intervaloData(data), status: { $ne: 'cancelado' } });
+    const conflito = agendamentosDoDia.some(item => inicio < minutos(item.horarioFim) + config.duracaoIntervaloEntre && fim + config.duracaoIntervaloEntre > minutos(item.horarioInicio));
     if (conflito) return respostaErro(res, 409, 'Horário já reservado');
     const agendamento = await Appointment.create({ profissionalId, servicoId, data: dataBanco(data), horarioInicio, horarioFim: horario(fim), nomeCliente: nomeCliente.trim(), telefoneCliente, tokenConfirmacao: crypto.randomBytes(24).toString('hex') });
     const links = await linksNotificacao(agendamento, profissional, vinculo.servico);
@@ -218,6 +225,15 @@ async function iniciar() {
   if (!process.env.MONGO_URI) console.warn('MONGO_URI não configurado.');
   else {
     await mongoose.connect(process.env.MONGO_URI);
+    let servicosPadrao = await Servico.find({ ativo: true });
+    if (servicosPadrao.length === 0) {
+      servicosPadrao = await Servico.insertMany([
+        { nome: 'Corte', preco: 50, duracaoMinutos: 30 },
+        { nome: 'Barba', preco: 35, duracaoMinutos: 30 },
+        { nome: 'Corte + Barba', preco: 75, duracaoMinutos: 60 }
+      ]);
+      console.log('Serviços padrão criados.');
+    }
     if (process.env.PROFISSIONAL_EMAIL && process.env.PROFISSIONAL_PASSWORD) {
       const existe = await Profissional.findOne({ 'usuario.email': process.env.PROFISSIONAL_EMAIL.toLowerCase() });
       if (!existe) {
@@ -228,7 +244,12 @@ async function iniciar() {
             email: process.env.PROFISSIONAL_EMAIL.toLowerCase(),
             senhaHash: await bcrypt.hash(process.env.PROFISSIONAL_PASSWORD, 10)
           },
-          horarioTrabalho: configPadrao
+          horarioTrabalho: configPadrao,
+          servicos: servicosPadrao.map(servico => ({
+            servicoId: servico._id,
+            preco: servico.preco,
+            duracaoMinutos: servico.duracaoMinutos
+          }))
         });
         console.log('Usuário profissional inicial criado.');
       }
