@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API || 'https://navalhado-1.onrender.com/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');

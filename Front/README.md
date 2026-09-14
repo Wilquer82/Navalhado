@@ -18,7 +18,7 @@ cp .env.example .env
 Edite o arquivo `.env` com a URL do seu backend:
 ```env
 # Para desenvolvimento local:
-VITE_API=http://localhost:5000/api
+VITE_API=https://navalhado-1.onrender.com/api
 
 # Para produção, use a URL pública da API:
 # VITE_API=https://SEU-BACKEND.onrender.com/api

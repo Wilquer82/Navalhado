@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API || 'https://navalhado-1.onrender.com/api';
 
 const dataLocalISO = data => {
   const ano = data.getFullYear();
