@@ -9,6 +9,7 @@ const Appointment = require('./models/Appointment');
 const Profissional = require('./models/Profissional');
 const Servico = require('./models/Servico');
 const ConfiguracaoGeral = require('./models/ConfiguracaoGeral');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -71,6 +72,47 @@ async function obterConfiguracao() {
   let config = await ConfiguracaoGeral.findOne();
   if (!config) config = await ConfiguracaoGeral.create({ horarioFuncionamento: configPadrao, duracaoIntervaloEntre: 15 });
   return config;
+}
+
+async function migrarDadosLegados() {
+  const config = await obterConfiguracao();
+  const servicos = await Servico.find({ ativo: true });
+  for (const servico of servicos) {
+    if (!servico.duracaoMinutos && servico.get('duracao')) {
+      servico.duracaoMinutos = servico.get('duracao');
+      await servico.save();
+    }
+  }
+
+  const profissionais = await Profissional.find();
+  for (const profissional of profissionais) {
+    const atualizacoes = {};
+    if (!profissional.descricao || profissional.descricao === 'Geral') atualizacoes.descricao = profissional.get('especialidade') || 'Geral';
+    if (!profissional.horarioTrabalho || profissional.horarioTrabalho.size === 0) atualizacoes.horarioTrabalho = configPadrao;
+    if (!profissional.servicos?.length && servicos.length) {
+      atualizacoes.servicos = servicos.map(servico => ({ servicoId: servico._id, preco: servico.preco, duracaoMinutos: servico.duracaoMinutos || servico.get('duracao') }));
+    }
+    if (Object.keys(atualizacoes).length) await Profissional.updateOne({ _id: profissional._id }, { $set: atualizacoes });
+  }
+
+  const colecao = mongoose.connection.db.collection('appointments');
+  const legados = await colecao.find({ profissionalId: { $exists: false } }).toArray();
+  for (const item of legados) {
+    const profissional = profissionais.find(registro => registro.nome === item.profissional);
+    const servico = servicos.find(registro => registro.nome.trim() === String(item.servico || '').trim());
+    if (!profissional || !servico || !/^\d{4}-\d{2}-\d{2}$/.test(item.data) || !/^\d{2}:\d{2}$/.test(item.horario)) continue;
+    const duracao = Number(item.duracao || servico.duracaoMinutos || servico.get('duracao'));
+    await colecao.updateOne({ _id: item._id }, { $set: {
+      profissionalId: profissional._id,
+      servicoId: servico._id,
+      data: dataBanco(item.data),
+      horarioInicio: item.horario,
+      horarioFim: horario(minutos(item.horario) + duracao),
+      telefoneCliente: item.telefone || '',
+      status: item.status === 'cancelado' ? 'cancelado' : item.status === 'concluido' ? 'concluido' : 'pendente',
+      criadoEm: item.createdAt || new Date()
+    }, $unset: { profissional: '', servico: '', duracao: '', preco: '', horario: '', telefone: '' }});
+  }
 }
 
 function horarioDoProfissional(profissional, data, config) {
@@ -181,9 +223,17 @@ app.get('/api/agendamentos/confirmar/:token', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase();
-  const profissional = await Profissional.findOne({ 'usuario.email': email, ativo: true });
-  if (!profissional || !profissional.usuario.senhaHash || !await bcrypt.compare(req.body.senha || '', profissional.usuario.senhaHash)) return respostaErro(res, 401, 'E-mail ou senha inválidos.');
+  const identificador = String(req.body.email || req.body.usuario || '').trim().toLowerCase();
+  let profissional = await Profissional.findOne({ 'usuario.email': identificador, ativo: true });
+  let senhaHash = profissional?.usuario?.senhaHash;
+  if (!profissional) {
+    const usuario = await User.findOne({ $or: [{ email: identificador }, { usuario: identificador }] });
+    if (usuario) {
+      profissional = await Profissional.findOne({ ativo: true }).sort({ nome: 1 });
+      senhaHash = usuario.senha;
+    }
+  }
+  if (!profissional || !senhaHash || !await bcrypt.compare(req.body.senha || '', senhaHash)) return respostaErro(res, 401, 'E-mail ou senha inválidos.');
   res.json({ token: jwt.sign({ profissionalId: profissional._id }, JWT_SECRET, { expiresIn: '8h' }), profissional: { id: profissional._id, nome: profissional.nome } });
 });
 
@@ -225,6 +275,7 @@ async function iniciar() {
   if (!process.env.MONGO_URI) console.warn('MONGO_URI não configurado.');
   else {
     await mongoose.connect(process.env.MONGO_URI);
+    await migrarDadosLegados();
     let servicosPadrao = await Servico.find({ ativo: true });
     if (servicosPadrao.length === 0) {
       servicosPadrao = await Servico.insertMany([
