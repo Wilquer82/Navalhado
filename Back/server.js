@@ -36,7 +36,7 @@ const dataValida = data => /^\d{4}-\d{2}-\d{2}$/.test(data) && !Number.isNaN(new
 const dataBanco = data => new Date(`${data}T12:00:00-03:00`);
 const intervaloData = data => ({
   $gte: new Date(`${data}T00:00:00-03:00`),
-  $lt: new Date(`${data}T00:00:00-03:00`).getTime() + 24 * 60 * 60 * 1000
+  $lt: new Date(new Date(`${data}T00:00:00-03:00`).getTime() + 24 * 60 * 60 * 1000)
 });
 const diaSemana = data => new Date(`${data}T12:00:00-03:00`).getDay();
 const dataFormatada = data => new Intl.DateTimeFormat('pt-BR', { timeZone: TIME_ZONE }).format(data);
@@ -216,7 +216,24 @@ app.get('/api/dados', async (req, res) => res.json({ profissionais: await Profis
 
 async function iniciar() {
   if (!process.env.MONGO_URI) console.warn('MONGO_URI não configurado.');
-  else await mongoose.connect(process.env.MONGO_URI);
+  else {
+    await mongoose.connect(process.env.MONGO_URI);
+    if (process.env.PROFISSIONAL_EMAIL && process.env.PROFISSIONAL_PASSWORD) {
+      const existe = await Profissional.findOne({ 'usuario.email': process.env.PROFISSIONAL_EMAIL.toLowerCase() });
+      if (!existe) {
+        await Profissional.create({
+          nome: process.env.PROFISSIONAL_NOME || 'Profissional Navalhado',
+          telefone: process.env.PROFISSIONAL_TELEFONE || '',
+          usuario: {
+            email: process.env.PROFISSIONAL_EMAIL.toLowerCase(),
+            senhaHash: await bcrypt.hash(process.env.PROFISSIONAL_PASSWORD, 10)
+          },
+          horarioTrabalho: configPadrao
+        });
+        console.log('Usuário profissional inicial criado.');
+      }
+    }
+  }
   app.listen(PORT, () => console.log(`API na porta ${PORT}`));
 }
 
