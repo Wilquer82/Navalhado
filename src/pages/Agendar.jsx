@@ -15,7 +15,6 @@ export default function Agendar() {
   const [profissionais, setProfissionais] = useState([]);
   const [servicos, setServicos] = useState([]);
   const [horarios, setHorarios] = useState([]);
-  const [ocupados, setOcupados] = useState([]);
   const [datas, setDatas] = useState([]);
   const [dataSel, setDataSel] = useState('');
   const [sucesso, setSucesso] = useState(false);
@@ -33,9 +32,7 @@ export default function Agendar() {
         return r.json();
       })
       .then(d => {
-        setProfissionais(d.profissionais || []);
-        setServicos(d.servicos || []);
-        setHorarios(d.horarios || []);
+        setProfissionais(d || []);
       })
       .catch(e => {
         if (e.name !== 'AbortError') console.log('Erro ao carregar dados iniciais:', e);
@@ -65,23 +62,22 @@ export default function Agendar() {
     setDatas(arr);
   };
 
-  // Carregar horários ocupados ao selecionar data/profissional
+  // O servidor calcula disponibilidade usando o serviço escolhido.
   useEffect(() => {
-    setOcupados([]);
-    if (!dataSel || !dados.profissional) return undefined;
+    if (!dataSel || !dados.profissional || !dados.servico) return undefined;
 
     const controller = new AbortController();
     const params = new URLSearchParams({
       data: dataSel,
-      profissional: dados.profissional.nome
+      servicoId: dados.servico._id
     });
 
-    fetch(`${API}/horarios-ocupados?${params}`, { signal: controller.signal })
+    fetch(`${API}/profissionais/${dados.profissional._id}/horarios-disponiveis?${params}`, { signal: controller.signal })
       .then(r => {
         if (!r.ok) throw new Error('Falha ao carregar horários');
         return r.json();
       })
-      .then(setOcupados)
+      .then(setHorarios)
       .catch(e => {
         if (e.name !== 'AbortError') console.log('Erro ao carregar horários:', e);
       });
@@ -91,7 +87,12 @@ export default function Agendar() {
 
   const selecionarProfissional = p => {
     setDados({ profissional: p });
+    setServicos([]);
     setDataSel('');
+    fetch(`${API}/profissionais/${p._id}/servicos`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error('Não foi possível carregar os serviços.')))
+      .then(setServicos)
+      .catch(e => setErroAgendamento(e.message));
     setStep(2);
   };
 
@@ -109,10 +110,6 @@ export default function Agendar() {
     setDados({ ...dados, [e.target.name]: e.target.value });
   };
 
-  const horarioOcupado = h => {
-    return ocupados.some(o => o.horario === h);
-  };
-
   const horarioPassado = h => {
     if (dataSel !== dataLocalISO(new Date())) return false;
     const [hora, minuto] = h.split(':').map(Number);
@@ -120,36 +117,38 @@ export default function Agendar() {
     return hora * 60 + minuto <= agora.getHours() * 60 + agora.getMinutes();
   };
 
-  const horarioIndisponivel = h => horarioOcupado(h) || horarioPassado(h);
-
-  const horarioDisponivelNoDia = h => {
-    const diaSemana = new Date(`${dataSel}T00:00:00`).getDay();
-    return diaSemana !== 0 && diaSemana !== 6 || h <= '14:00';
-  };
-
   const confirmar = async e => {
     e.preventDefault();
     setCarregando(true);
     setErroAgendamento('');
+    const telefone = (dados.telefone || '').replace(/\D/g, '');
+    if ((dados.nomeCliente || '').trim().length < 3) {
+      setErroAgendamento('Nome deve ter pelo menos 3 caracteres.');
+      setCarregando(false);
+      return;
+    }
+    if (telefone.length < 10 || telefone.length > 11) {
+      setErroAgendamento('Informe um telefone válido.');
+      setCarregando(false);
+      return;
+    }
     try {
       const res = await fetch(`${API}/agendamentos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profissional: dados.profissional.nome,
-          servico: dados.servico.nome,
-          duracao: dados.servico.duracao,
-          preco: dados.servico.preco,
+          profissionalId: dados.profissional._id,
+          servicoId: dados.servico._id,
           data: dados.data,
-          horario: dados.horario,
+          horarioInicio: dados.horario,
           nomeCliente: dados.nomeCliente,
-          telefone: dados.telefone,
-          email: dados.email || '',
-          observacoes: dados.observacoes || ''
+          telefoneCliente: telefone
         })
       });
 
-      if (!res.ok) throw new Error('Erro ao agendar. Tente novamente.');
+      const resposta = await res.json();
+      if (!res.ok) throw new Error(resposta.erro || 'Erro ao agendar. Tente novamente.');
+      setDados({ ...dados, whatsappCliente: resposta.whatsappCliente });
       setSucesso(true);
     } catch (e) {
       setErroAgendamento(e.message || 'Não foi possível concluir o agendamento.');
@@ -182,7 +181,7 @@ export default function Agendar() {
           </div>
         </div>
         <div className="icon">✓</div>
-        <h2>Agendamento confirmado!</h2>
+        <h2>Solicitação enviada!</h2>
         <p>
           <strong>{dados.profissional?.nome}</strong><br />
           {dados.servico?.nome}<br />
@@ -190,7 +189,9 @@ export default function Agendar() {
             weekday: 'long', day: 'numeric', month: 'long'
           })} às {dados.horario}
         </p>
-        <button className="btn" onClick={reiniciar}>Novo agendamento</button>
+        <p>Aguarde confirmação do profissional.</p>
+        {dados.whatsappCliente && <a className="btn" href={dados.whatsappCliente} target="_blank" rel="noreferrer">Enviar mensagem no WhatsApp</a>}
+        <button className="btn btn-outline" onClick={reiniciar}>Novo agendamento</button>
       </div>
     );
   }
@@ -246,7 +247,7 @@ export default function Agendar() {
             profissionais.map(p => (
               <div key={p._id || p.id} className="card" onClick={() => selecionarProfissional(p)}>
                 <h3>{p.nome}</h3>
-                <p>{p.especialidade}</p>
+                <p>{p.descricao || 'Geral'}</p>
               </div>
             ))
           ) : (
@@ -264,7 +265,7 @@ export default function Agendar() {
               <h3>{s.nome}</h3>
               <div className="meta">
                 <span className="preco">R$ {s.preco}</span>
-                <span className="duracao">{s.duracao} min</span>
+                <span className="duracao">{s.duracaoMinutos} min</span>
               </div>
             </div>
           ))}
@@ -303,19 +304,19 @@ export default function Agendar() {
                 </span>
               </div>
               <div className="day-calendar" aria-label="Horários disponíveis">
-                {horarios.filter(horarioDisponivelNoDia).map(h => (
+                {horarios.map(h => (
                   <div
-                    key={h}
-                    className={`calendar-slot ${horarioOcupado(h) ? 'occupied' : ''} ${horarioPassado(h) ? 'past' : ''}`}
+                    key={h.horarioInicio}
+                    className={`calendar-slot ${horarioPassado(h.horarioInicio) ? 'past' : ''}`}
                   >
-                    <span className="calendar-time">{h}</span>
+                    <span className="calendar-time">{h.horarioInicio}</span>
                     <button
                       type="button"
                       className="calendar-event"
-                      disabled={horarioIndisponivel(h)}
-                      onClick={() => !horarioIndisponivel(h) && selecionarHorario(h)}
+                      disabled={horarioPassado(h.horarioInicio)}
+                      onClick={() => !horarioPassado(h.horarioInicio) && selecionarHorario(h.horarioInicio)}
                     >
-                      {horarioIndisponivel(h) ? 'Indisponível' : 'Disponível'}
+                      {horarioPassado(h.horarioInicio) ? 'Indisponível' : 'Disponível'}
                     </button>
                   </div>
                 ))}
@@ -339,7 +340,7 @@ export default function Agendar() {
             <h4>Resumo do agendamento</h4>
             <div className="row"><span>Profissional</span><span>{dados.profissional?.nome}</span></div>
             <div className="row"><span>Serviço</span><span>{dados.servico?.nome}</span></div>
-            <div className="row"><span>Duração</span><span>{dados.servico?.duracao} min</span></div>
+            <div className="row"><span>Duração</span><span>{dados.servico?.duracaoMinutos} min</span></div>
             <div className="row"><span>Data</span><span>{new Date(dados.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span></div>
             <div className="row"><span>Horário</span><span>{dados.horario}</span></div>
             <div className="row total"><span>Total</span><span>R$ {dados.servico?.preco}</span></div>
@@ -351,15 +352,11 @@ export default function Agendar() {
           </div>
           <div className="form-group">
             <label>Telefone *</label>
-            <input name="telefone" value={dados.telefone || ''} onChange={atualizarDados} required placeholder="(11) 99999-9999" />
-          </div>
-          <div className="form-group">
-            <label>E-mail</label>
-            <input name="email" type="email" value={dados.email || ''} onChange={atualizarDados} />
-          </div>
-          <div className="form-group">
-            <label>Observações</label>
-            <textarea name="observacoes" value={dados.observacoes || ''} onChange={atualizarDados} placeholder="Alguma observação?" />
+            <input name="telefone" value={dados.telefone || ''} onChange={e => {
+              const valor = e.target.value.replace(/\D/g, '').slice(0, 11);
+              const mascara = valor.length > 10 ? valor.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3') : valor.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+              atualizarDados({ target: { name: 'telefone', value: mascara } });
+            }} required placeholder="(11) 99999-9999" />
           </div>
 
           <button type="submit" className="btn" disabled={carregando}>

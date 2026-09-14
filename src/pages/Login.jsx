@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const API = import.meta.env.VITE_API || 'http://localhost:5000/api';
 
 export default function Login() {
-  const [usuario, setUsuario] = useState('');
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -15,10 +15,10 @@ export default function Login() {
     setErro('');
     setCarregando(true);
     try {
-      const res = await fetch(`${API}/login`, {
+      const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, senha })
+        body: JSON.stringify({ email, senha })
       });
       const dado = await res.json();
 
@@ -57,8 +57,8 @@ export default function Login() {
         
         <form onSubmit={entrar}>
           <div className="form-group" style={{ margin: '0 0 16px 0' }}>
-            <label>Usuário</label>
-            <input value={usuario} onChange={e => setUsuario(e.target.value)} required />
+            <label>E-mail</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
           </div>
           <div className="form-group" style={{ margin: '0 0 20px 0' }}>
             <label>Senha</label>
