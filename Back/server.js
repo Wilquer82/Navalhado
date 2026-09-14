@@ -58,6 +58,15 @@ const autenticar = (req, res, next) => {
   }
 };
 
+const autenticarOpcional = (req, res, next) => {
+  const cabecalho = req.headers.authorization;
+  const token = cabecalho?.startsWith('Bearer ') ? cabecalho.slice(7).trim() : '';
+  if (token) {
+    try { req.auth = jwt.verify(token, JWT_SECRET); } catch { delete req.auth; }
+  }
+  next();
+};
+
 const configPadrao = {
   domingo: null,
   segunda: { inicio: '08:00', fim: '18:00' },
@@ -149,13 +158,13 @@ async function linksNotificacao(agendamento, profissional, servico) {
   };
 }
 
-app.get('/api/profissionais', async (req, res) => {
+app.get('/api/profissionais', autenticarOpcional, async (req, res) => {
   try {
     res.json(await Profissional.find({ ativo: true }).select('-usuario.senhaHash').sort({ nome: 1 }));
   } catch (error) { respostaErro(res, 500, error.message); }
 });
 
-app.get('/api/profissionais/:id/servicos', async (req, res) => {
+app.get('/api/profissionais/:id/servicos', autenticarOpcional, async (req, res) => {
   try {
     const profissional = await Profissional.findOne({ _id: req.params.id, ativo: true }).populate('servicos.servicoId');
     if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
@@ -165,7 +174,7 @@ app.get('/api/profissionais/:id/servicos', async (req, res) => {
   } catch (error) { respostaErro(res, 400, 'Profissional inválido.'); }
 });
 
-app.get('/api/profissionais/:id/horarios-disponiveis', async (req, res) => {
+app.get('/api/profissionais/:id/horarios-disponiveis', autenticarOpcional, async (req, res) => {
   try {
     const { data, servicoId } = req.query;
     if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
@@ -191,7 +200,7 @@ app.get('/api/profissionais/:id/horarios-disponiveis', async (req, res) => {
   } catch (error) { respostaErro(res, 400, error.message); }
 });
 
-app.post('/api/agendamentos', async (req, res) => {
+app.post('/api/agendamentos', autenticarOpcional, async (req, res) => {
   try {
     const { profissionalId, servicoId, data, horarioInicio, nomeCliente, telefoneCliente } = req.body;
     if (!profissionalId || !servicoId || !data || !horarioInicio || !nomeCliente || !telefoneCliente) return respostaErro(res, 400, 'Preencha todos os campos obrigatórios.');
@@ -216,7 +225,7 @@ app.post('/api/agendamentos', async (req, res) => {
   } catch (error) { respostaErro(res, 400, error.message); }
 });
 
-app.get('/api/agendamentos/confirmar/:token', async (req, res) => {
+app.get('/api/agendamentos/confirmar/:token', autenticarOpcional, async (req, res) => {
   const agendamento = await Appointment.findOneAndUpdate({ tokenConfirmacao: req.params.token, status: 'pendente' }, { status: 'confirmado' }, { new: true });
   if (!agendamento) return respostaErro(res, 404, 'Link inválido ou agendamento já confirmado.');
   res.json({ mensagem: 'Agendamento confirmado com sucesso.' });
