@@ -20,9 +20,16 @@ const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 
 app.use(express.json());
 app.use(cors({
   origin: (origin, callback) => {
-    const permitidas = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+    const permitidas = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://navalhado.onrender.com')
       .split(',').map(item => item.trim()).filter(Boolean);
-    if (!origin || permitidas.includes(origin)) return callback(null, true);
+
+    if (!origin || permitidas.includes(origin) || permitidas.includes('*')) {
+      return callback(null, true);
+    }
+
+    const aceitaRender = permitidas.some(item => item.endsWith('.onrender.com') && origin.endsWith(item.replace('*', '')));
+    if (aceitaRender) return callback(null, true);
+
     return callback(new Error('Origem não permitida pelo CORS'));
   }
 }));
