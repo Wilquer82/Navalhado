@@ -1,5 +1,5 @@
 [build]
-  base = "Front"
+  base = "."
   command = "npm install && npm run build"
   publish = "Front/dist"
 
