@@ -1,20 +1,20 @@
 {
-  "name": "salao-navalhado",
+  "name": "navalhado-monorepo",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
+  "workspaces": [
+    "Back",
+    "Front"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
+    "dev": "concurrently \"npm run dev:back\" \"npm run dev:front\"",
+    "dev:back": "npm --prefix Back run dev",
+    "dev:front": "npm --prefix Front run dev -- --host 0.0.0.0",
+    "build": "npm --prefix Front run build",
+    "start": "npm --prefix Back run start",
+    "check": "node --check Back/server.js && npm --prefix Front run build"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.0"
+    "concurrently": "^9.0.1"
   }
 }
