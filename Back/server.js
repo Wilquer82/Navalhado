@@ -115,6 +115,15 @@ const auth = (req, res, next) => {
   } catch { res.status(401).json({ erro: 'Token inválido' }) }
 };
 
+const authOpcional = (req, res, next) => {
+  const cabecalho = req.headers.authorization;
+  const token = cabecalho?.startsWith('Bearer ') ? cabecalho.slice(7).trim() : '';
+  if (token) {
+    try { req.usuario = jwt.verify(token, process.env.JWT_SECRET); } catch { delete req.usuario; }
+  }
+  next();
+};
+
 // ===== FUNÇÃO AUXILIAR: Verificar se horário está bloqueado =====
 const horarioEstaBloqueado = async (profissional, data, horario) => {
   const dataObj = new Date(data + 'T00:00:00');
@@ -297,7 +306,7 @@ app.delete('/api/agendamentos/:id', auth, async (req, res) => {
 });
 
 // ===== CRUD PROFISSIONAIS =====
-app.get('/api/profissionais', auth, async (req, res) => {
+app.get('/api/profissionais', authOpcional, async (req, res) => {
   res.json(await Profissional.find().sort({ nome: 1 }));
 });
 
