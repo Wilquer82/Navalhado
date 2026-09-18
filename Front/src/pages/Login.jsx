@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = import.meta.env.VITE_API || 'https://navalhado-1.onrender.com/api';
+const API = import.meta.env.VITE_API || 'https://navalhadoback.onrender.com/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
