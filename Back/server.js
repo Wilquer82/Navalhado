@@ -20,7 +20,7 @@ const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 
 app.use(express.json());
 app.use(cors({
   origin: (origin, callback) => {
-    const permitidas = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://navalhado.onrender.com')
+    const permitidas = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://navalhado.onrender.com,https://navalhado-1.onrender.com,https://navalhadoback.onrender.com')
       .split(',').map(item => item.trim()).filter(Boolean);
 
     if (!origin || permitidas.includes(origin) || permitidas.includes('*')) {
