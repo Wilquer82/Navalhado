@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { app, PORT } = require('./app');
+
+// Models
 const Profissional = require('./models/Profissional');
 const Servico = require('./models/Servico');
 const ConfiguracaoGeral = require('./models/ConfiguracaoGeral');
@@ -11,7 +13,6 @@ const Appointment = require('./models/Appointment');
 
 const TIME_ZONE = 'America/Sao_Paulo';
 const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-
 const configPadrao = {
   domingo: null,
   segunda: { inicio: '08:00', fim: '18:00' },
@@ -93,7 +94,7 @@ async function obterConfiguracao() {
 
 function horarioDoProfissional(profissional, data, config) {
   const nomeDia = diasSemana[diaSemana(data)];
-  return profissional.horarioTrabalho?.get(nomeDia) || config.horarioFuncionamento?.get(nomeDia) || configPadrao[nomeDia];
+  return profissional.horarioTrabalho?.[nomeDia] || config.horarioFuncionamento?.[nomeDia] || configPadrao[nomeDia];
 }
 
 function folga(profissional, data) {
@@ -135,7 +136,6 @@ async function garantirDadosIniciais() {
     ]);
     console.log('Serviços padrão criados.');
   }
-
   const adminExistente = await User.findOne({ $or: [{ usuario: 'admin' }, { email: 'admin@navalhado.com' }] });
   if (!adminExistente) {
     await User.create({
@@ -145,7 +145,6 @@ async function garantirDadosIniciais() {
     });
     console.log('Usuário admin padrão criado.');
   }
-
   const profissionaisPadrao = ['Victor Gabriel', 'Paulo Vitor', 'Denis'];
   for (const nome of profissionaisPadrao) {
     const profissionalExiste = await Profissional.findOne({ nome, ativo: true });
@@ -164,7 +163,6 @@ async function garantirDadosIniciais() {
       console.log(`Profissional padrão criado: ${nome}`);
     }
   }
-
   if (process.env.PROFISSIONAL_EMAIL && process.env.PROFISSIONAL_PASSWORD) {
     const existe = await Profissional.findOne({ 'usuario.email': process.env.PROFISSIONAL_EMAIL.toLowerCase() });
     if (!existe) {
@@ -188,13 +186,22 @@ async function garantirDadosIniciais() {
 }
 
 async function iniciar() {
-  if (!process.env.MONGO_URI) console.warn('MONGO_URI não configurado.');
-  else {
-    await mongoose.connect(process.env.MONGO_URI);
+  // Aceita os DOIS nomes de variável — MONGO_URI ou MONGODB_URI
+  const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+  
+  if (!MONGODB_URI) {
+    console.warn('⚠️ ERRO: Defina MONGO_URI ou MONGODB_URI nas variáveis de ambiente!');
+  } else {
+    await mongoose.connect(MONGODB_URI);
+    console.log('✅ Conectado ao MongoDB');
     await migrarDadosLegados();
     await garantirDadosIniciais();
   }
-  app.listen(PORT, () => console.log(`API na porta ${PORT}`));
+  
+  app.listen(PORT, () => console.log(`🚀 API na porta ${PORT}`));
 }
 
-if (require.main === module) iniciar().catch(error => { console.error('Erro ao iniciar:', error); process.exit(1); });
+if (require.main === module) iniciar().catch(error => { 
+  console.error('❌ Erro ao iniciar:', error.message); 
+  process.exit(1); 
+});
