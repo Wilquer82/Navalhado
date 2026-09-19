@@ -8,11 +8,15 @@ const appointmentSchema = new mongoose.Schema({
   horarioFim: { type: String, required: true },
   nomeCliente: { type: String, required: true },
   telefoneCliente: { type: String, required: true },
+  observacoes: { type: String, default: '' },
   status: { type: String, enum: ['pendente', 'confirmado', 'concluido', 'cancelado'], default: 'pendente' },
   criadoEm: { type: Date, default: Date.now },
   tokenConfirmacao: { type: String, unique: true, sparse: true }
 }, { timestamps: true });
 
-appointmentSchema.index({ profissionalId: 1, data: 1, horarioInicio: 1 });
+appointmentSchema.index(
+  { profissionalId: 1, data: 1, horarioInicio: 1 },
+  { unique: true, partialFilterExpression: { status: { $ne: 'cancelado' } } }
+);
 
 module.exports = mongoose.model('Appointment', appointmentSchema);
