@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const API = import.meta.env.VITE_API || 'https://navalhadoback.onrender.com/api';
 
@@ -376,9 +377,9 @@ export default function Agendar() {
           ℹ️ Sobre o salão
         </a>
         <span style={{ color: '#ddd' }}>|</span>
-        <a href="/login" style={{ color: '#999', textDecoration: 'none' }}>
+        <Link to="/login" style={{ color: '#999', textDecoration: 'none' }}>
           🔐 Área dos profissionais
-        </a>
+        </Link>
       </div>
     </>
   );
