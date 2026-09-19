@@ -287,40 +287,74 @@ app.get('/api/profissional/agenda/exportar', autenticar, async (req, res) => {
 
 app.get('/api/dados', async (req, res) => res.json({ profissionais: await Profissional.find({ ativo: true }).select('-usuario.senhaHash') }));
 
+async function garantirDadosIniciais() {
+  let servicosPadrao = await Servico.find({ ativo: true });
+  if (servicosPadrao.length === 0) {
+    servicosPadrao = await Servico.insertMany([
+      { nome: 'Corte', preco: 50, duracaoMinutos: 30 },
+      { nome: 'Barba', preco: 35, duracaoMinutos: 30 },
+      { nome: 'Corte + Barba', preco: 75, duracaoMinutos: 60 }
+    ]);
+    console.log('Serviços padrão criados.');
+  }
+
+  const adminExistente = await User.findOne({ $or: [{ usuario: 'admin' }, { email: 'admin@navalhado.com' }] });
+  if (!adminExistente) {
+    await User.create({
+      usuario: 'admin',
+      email: 'admin@navalhado.com',
+      senha: await bcrypt.hash('1234', 10)
+    });
+    console.log('Usuário admin padrão criado.');
+  }
+
+  const profissionaisPadrao = ['Victor Gabriel', 'Paulo Vitor', 'Denis'];
+  for (const nome of profissionaisPadrao) {
+    const profissionalExiste = await Profissional.findOne({ nome, ativo: true });
+    if (!profissionalExiste) {
+      await Profissional.create({
+        nome,
+        descricao: 'Geral',
+        telefone: '',
+        horarioTrabalho: configPadrao,
+        servicos: servicosPadrao.map(servico => ({
+          servicoId: servico._id,
+          preco: servico.preco,
+          duracaoMinutos: servico.duracaoMinutos
+        }))
+      });
+      console.log(`Profissional padrão criado: ${nome}`);
+    }
+  }
+
+  if (process.env.PROFISSIONAL_EMAIL && process.env.PROFISSIONAL_PASSWORD) {
+    const existe = await Profissional.findOne({ 'usuario.email': process.env.PROFISSIONAL_EMAIL.toLowerCase() });
+    if (!existe) {
+      await Profissional.create({
+        nome: process.env.PROFISSIONAL_NOME || 'Profissional Navalhado',
+        telefone: process.env.PROFISSIONAL_TELEFONE || '',
+        usuario: {
+          email: process.env.PROFISSIONAL_EMAIL.toLowerCase(),
+          senhaHash: await bcrypt.hash(process.env.PROFISSIONAL_PASSWORD, 10)
+        },
+        horarioTrabalho: configPadrao,
+        servicos: servicosPadrao.map(servico => ({
+          servicoId: servico._id,
+          preco: servico.preco,
+          duracaoMinutos: servico.duracaoMinutos
+        }))
+      });
+      console.log('Usuário profissional inicial criado.');
+    }
+  }
+}
+
 async function iniciar() {
   if (!process.env.MONGO_URI) console.warn('MONGO_URI não configurado.');
   else {
     await mongoose.connect(process.env.MONGO_URI);
     await migrarDadosLegados();
-    let servicosPadrao = await Servico.find({ ativo: true });
-    if (servicosPadrao.length === 0) {
-      servicosPadrao = await Servico.insertMany([
-        { nome: 'Corte', preco: 50, duracaoMinutos: 30 },
-        { nome: 'Barba', preco: 35, duracaoMinutos: 30 },
-        { nome: 'Corte + Barba', preco: 75, duracaoMinutos: 60 }
-      ]);
-      console.log('Serviços padrão criados.');
-    }
-    if (process.env.PROFISSIONAL_EMAIL && process.env.PROFISSIONAL_PASSWORD) {
-      const existe = await Profissional.findOne({ 'usuario.email': process.env.PROFISSIONAL_EMAIL.toLowerCase() });
-      if (!existe) {
-        await Profissional.create({
-          nome: process.env.PROFISSIONAL_NOME || 'Profissional Navalhado',
-          telefone: process.env.PROFISSIONAL_TELEFONE || '',
-          usuario: {
-            email: process.env.PROFISSIONAL_EMAIL.toLowerCase(),
-            senhaHash: await bcrypt.hash(process.env.PROFISSIONAL_PASSWORD, 10)
-          },
-          horarioTrabalho: configPadrao,
-          servicos: servicosPadrao.map(servico => ({
-            servicoId: servico._id,
-            preco: servico.preco,
-            duracaoMinutos: servico.duracaoMinutos
-          }))
-        });
-        console.log('Usuário profissional inicial criado.');
-      }
-    }
+    await garantirDadosIniciais();
   }
   app.listen(PORT, () => console.log(`API na porta ${PORT}`));
 }
