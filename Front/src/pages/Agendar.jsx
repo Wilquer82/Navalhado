@@ -21,6 +21,8 @@ export default function Agendar() {
   const [sucesso, setSucesso] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [carregandoProfissionais, setCarregandoProfissionais] = useState(true);
+  const [carregandoHorarios, setCarregandoHorarios] = useState(false);
+  const [erroHorarios, setErroHorarios] = useState('');
   const [erroAgendamento, setErroAgendamento] = useState('');
 
   // Carregar dados iniciais
@@ -64,27 +66,41 @@ export default function Agendar() {
   };
 
   // O servidor calcula disponibilidade usando o serviço escolhido.
+  const profissionalId = dados.profissional?._id;
+  const servicoId = dados.servico?._id;
+
   useEffect(() => {
-    if (!dataSel || !dados.profissional || !dados.servico) return undefined;
+    if (!dataSel || !profissionalId || !servicoId) {
+      setHorarios([]);
+      setErroHorarios('');
+      setCarregandoHorarios(false);
+      return undefined;
+    }
 
     const controller = new AbortController();
     const params = new URLSearchParams({
       data: dataSel,
-      servicoId: dados.servico._id
+      servicoId
     });
 
-    fetch(`${API}/profissionais/${dados.profissional._id}/horarios-disponiveis?${params}`, { signal: controller.signal })
+    setHorarios([]);
+    setErroHorarios('');
+    setCarregandoHorarios(true);
+    fetch(`${API}/profissionais/${profissionalId}/horarios-disponiveis?${params}`, { signal: controller.signal })
       .then(r => {
         if (!r.ok) throw new Error('Falha ao carregar horários');
         return r.json();
       })
       .then(setHorarios)
       .catch(e => {
-        if (e.name !== 'AbortError') console.log('Erro ao carregar horários:', e);
+        if (e.name !== 'AbortError') setErroHorarios('Não foi possível carregar os horários. Tente selecionar a data novamente.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCarregandoHorarios(false);
       });
 
     return () => controller.abort();
-  }, [dataSel, dados.profissional]);
+  }, [dataSel, profissionalId, servicoId]);
 
   const selecionarProfissional = p => {
     setDados({ profissional: p });
@@ -305,22 +321,30 @@ export default function Agendar() {
                 </span>
               </div>
               <div className="day-calendar" aria-label="Horários disponíveis">
-                {horarios.map(h => (
-                  <div
-                    key={h.horarioInicio}
-                    className={`calendar-slot ${horarioPassado(h.horarioInicio) ? 'past' : ''}`}
-                  >
-                    <span className="calendar-time">{h.horarioInicio}</span>
-                    <button
-                      type="button"
-                      className="calendar-event"
-                      disabled={horarioPassado(h.horarioInicio)}
-                      onClick={() => !horarioPassado(h.horarioInicio) && selecionarHorario(h.horarioInicio)}
+                {carregandoHorarios ? (
+                  <div className="loading" role="status">Carregando horários...</div>
+                ) : erroHorarios ? (
+                  <div className="form-error" role="alert">{erroHorarios}</div>
+                ) : horarios.length > 0 ? (
+                  horarios.map(h => (
+                    <div
+                      key={h.horarioInicio}
+                      className={`calendar-slot ${horarioPassado(h.horarioInicio) ? 'past' : ''}`}
                     >
-                      {horarioPassado(h.horarioInicio) ? 'Indisponível' : 'Disponível'}
-                    </button>
-                  </div>
-                ))}
+                      <span className="calendar-time">{h.horarioInicio}</span>
+                      <button
+                        type="button"
+                        className="calendar-event"
+                        disabled={horarioPassado(h.horarioInicio)}
+                        onClick={() => !horarioPassado(h.horarioInicio) && selecionarHorario(h.horarioInicio)}
+                      >
+                        {horarioPassado(h.horarioInicio) ? 'Indisponível' : 'Disponível'}
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="loading">Nenhum horário disponível para esta data.</div>
+                )}
               </div>
             </>
           )}

@@ -7,6 +7,7 @@ const {
   dataBanco,
   intervaloData,
   diaSemana,
+  diasSemana,
   minutos,
   horario,
   horariosSobrepostos,
