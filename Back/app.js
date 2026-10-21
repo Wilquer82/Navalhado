@@ -18,6 +18,7 @@ const servicosRoutes = require('./routes/servicos');
 const bloqueiosRoutes = require('./routes/bloqueios');
 const agendamentosRoutes = require('./routes/agendamentos');
 const profissionalRoutes = require('./routes/profissional');
+const { configuracaoVapid } = require('./services/lembretes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,6 +45,15 @@ app.use('/api/servicos', servicosRoutes);
 app.use('/api/bloqueios', bloqueiosRoutes);
 app.use('/api/agendamentos', agendamentosRoutes);
 app.use('/api/profissional', profissionalRoutes);
+
+// Chave pública VAPID para o front assinar notificações (sem segredo)
+app.get('/api/push/vapid-public-key', (req, res) => {
+  const config = configuracaoVapid();
+  if (!config?.publicKey) {
+    return res.status(503).json({ erro: 'Notificações push não configuradas no servidor.' });
+  }
+  res.json({ publicKey: config.publicKey });
+});
 
 // Rota pública de dados
 app.get('/api/dados', async (req, res) => {
