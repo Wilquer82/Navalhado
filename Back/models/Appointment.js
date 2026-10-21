@@ -14,6 +14,15 @@ const appointmentSchema = new mongoose.Schema({
   pushSubscription: { type: mongoose.Schema.Types.Mixed },
   nomeCliente: { type: String, required: true },
   telefoneCliente: { type: String, required: true },
+  pagamento: {
+    tipo: { type: String, enum: ['integral', 'sinal_pix'], default: 'integral' },
+    valorOriginal: { type: Number, min: 0 },
+    valorSinal: { type: Number, min: 0, default: 0 },
+    desconto: { type: Number, min: 0, default: 0 },
+    valorFinal: { type: Number, min: 0 },
+    valorRestante: { type: Number, min: 0 },
+    aceiteSinal: { type: Boolean, default: false }
+  },
   observacoes: { type: String, default: '' },
   status: { type: String, enum: ['pendente', 'confirmado', 'concluido', 'cancelado'], default: 'pendente' },
   criadoEm: { type: Date, default: Date.now },

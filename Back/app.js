@@ -50,9 +50,9 @@ app.use('/api/profissional', profissionalRoutes);
 app.get('/api/push/vapid-public-key', (req, res) => {
   const config = configuracaoVapid();
   if (!config?.publicKey) {
-    return res.status(503).json({ erro: 'Notificações push não configuradas no servidor.' });
+    return res.json({ publicKey: null, disponivel: false });
   }
-  res.json({ publicKey: config.publicKey });
+  res.json({ publicKey: config.publicKey, disponivel: true });
 });
 
 // Rota pública de dados

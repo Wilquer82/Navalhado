@@ -25,7 +25,7 @@ const serializarProfissional = (p, incluirPix = false) => ({
 
 router.get('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const profissionais = await Profissional.find({ ativo: true }).select('-usuario.senhaHash').sort({ nome: 1 });
-  res.json(profissionais.map(p => serializarProfissional(p, Boolean(req.auth))));
+  res.json(profissionais.map(p => serializarProfissional(p, true)));
 }));
 
 router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) => {

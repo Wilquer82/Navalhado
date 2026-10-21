@@ -10,6 +10,24 @@ const dataLocalISO = data => {
   return `${ano}-${mes}-${dia}`;
 };
 
+const formatarMoeda = valor => Number(valor || 0).toLocaleString('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
+const calcularSinalPix = preco => {
+  const original = Math.round(Number(preco || 0) * 100);
+  const sinal = Math.round(original / 2);
+  const desconto = Math.round(original / 10);
+  return {
+    original: original / 100,
+    sinal: sinal / 100,
+    desconto: desconto / 100,
+    total: (original - desconto) / 100,
+    restante: (original - desconto - sinal) / 100
+  };
+};
+
 const chaveVapidParaBytes = chave => {
   const base64 = chave.replace(/-/g, '+').replace(/_/g, '/');
   const preenchida = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
@@ -61,6 +79,9 @@ export default function Agendar() {
   const [erroHorarios, setErroHorarios] = useState('');
   const [erroAgendamento, setErroAgendamento] = useState('');
   const [querLembrete, setQuerLembrete] = useState(true);
+  const [usarSinalPix, setUsarSinalPix] = useState(false);
+  const [aceiteSinal, setAceiteSinal] = useState(false);
+  const [mensagemPix, setMensagemPix] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -102,6 +123,7 @@ export default function Agendar() {
 
   const profissionalId = dados.profissional?._id;
   const servicoId = dados.servico?._id;
+  const valoresPix = calcularSinalPix(dados.servico?.preco);
 
   useEffect(() => {
     if (!dataSel || !profissionalId || !servicoId) {
@@ -138,6 +160,9 @@ export default function Agendar() {
 
   const selecionarProfissional = p => {
     setDados({ profissional: p });
+    setUsarSinalPix(false);
+    setAceiteSinal(false);
+    setMensagemPix('');
     setServicos([]);
     setDataSel('');
     fetch(`${API}/profissionais/${p._id}/servicos`)
@@ -170,6 +195,10 @@ export default function Agendar() {
 
   const confirmar = async e => {
     e.preventDefault();
+    if (usarSinalPix && !aceiteSinal) {
+      setErroAgendamento('Confirme o compromisso de pagamento do sinal para continuar.');
+      return;
+    }
     setCarregando(true);
     setErroAgendamento('');
     const telefone = (dados.telefone || '').replace(/\D/g, '');
@@ -209,7 +238,9 @@ export default function Agendar() {
           horarioInicio: dados.horario,
           nomeCliente: dados.nomeCliente,
           telefoneCliente: telefone,
-          pushSubscription
+          pushSubscription,
+          usarSinalPix,
+          aceiteSinal
         })
       });
 
@@ -218,6 +249,8 @@ export default function Agendar() {
       setDados({
         ...dados,
         whatsappCliente: resposta.whatsappCliente,
+        pagamento: resposta.pagamento,
+        chavePix: resposta.chavePix,
         lembreteAtivado: Boolean(pushSubscription),
         motivoLembrete
       });
@@ -236,6 +269,18 @@ export default function Agendar() {
     setSucesso(false);
     setErroAgendamento('');
     setQuerLembrete(true);
+    setUsarSinalPix(false);
+    setAceiteSinal(false);
+    setMensagemPix('');
+  };
+
+  const copiarChavePix = async () => {
+    try {
+      await navigator.clipboard.writeText(dados.profissional?.chavePix || dados.chavePix);
+      setMensagemPix('Chave PIX copiada.');
+    } catch {
+      setMensagemPix('Não foi possível copiar automaticamente. Selecione o campo PIX e copie o conteúdo.');
+    }
   };
 
   const textoLembreteSucesso = () => {
@@ -279,6 +324,34 @@ export default function Agendar() {
           })} às {dados.horario}
         </p>
         <p>Aguarde confirmação do profissional.</p>
+        {dados.pagamento && (
+          <div className="summary">
+            <div className="row"><span>Total do serviço</span><span>{formatarMoeda(dados.pagamento.valorOriginal)}</span></div>
+            {dados.pagamento.tipo === 'sinal_pix' ? (
+              <>
+                <div className="row"><span>Sinal PIX a pagar agora</span><span>{formatarMoeda(dados.pagamento.valorSinal)}</span></div>
+                <div className="row"><span>Desconto (10%)</span><span>-{formatarMoeda(dados.pagamento.desconto)}</span></div>
+                <div className="row"><span>Total com desconto</span><span>{formatarMoeda(dados.pagamento.valorFinal)}</span></div>
+                <div className="row total"><span>Saldo restante</span><span>{formatarMoeda(dados.pagamento.valorRestante)}</span></div>
+                <p>O pagamento PIX não é confirmado automaticamente. Faça a transferência no app do seu banco e aguarde a confirmação do profissional.</p>
+                {dados.chavePix && (
+                  <>
+                    <input
+                      aria-label="Chave PIX do profissional"
+                      readOnly
+                      value={dados.chavePix}
+                      onClick={e => e.target.select()}
+                    />
+                    <button type="button" className="btn btn-outline" onClick={copiarChavePix}>Copiar PIX</button>
+                    {mensagemPix && <p role="status">{mensagemPix}</p>}
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="row total"><span>Valor integral</span><span>{formatarMoeda(dados.pagamento.valorFinal)}</span></div>
+            )}
+          </div>
+        )}
         <p>{textoLembreteSucesso()}</p>
         {dados.whatsappCliente && <a className="btn" href={dados.whatsappCliente} target="_blank" rel="noreferrer">Enviar mensagem no WhatsApp</a>}
         <button className="btn btn-outline" onClick={reiniciar}>Novo agendamento</button>
@@ -437,8 +510,71 @@ export default function Agendar() {
             <div className="row"><span>Duração</span><span>{dados.servico?.duracaoMinutos} min</span></div>
             <div className="row"><span>Data</span><span>{new Date(dados.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span></div>
             <div className="row"><span>Horário</span><span>{dados.horario}</span></div>
-            <div className="row total"><span>Total</span><span>R$ {dados.servico?.preco}</span></div>
+            <div className="row"><span>Valor do serviço</span><span>{formatarMoeda(valoresPix.original)}</span></div>
+            {usarSinalPix ? (
+              <>
+                <div className="row"><span>Sinal PIX (50%)</span><span>{formatarMoeda(valoresPix.sinal)}</span></div>
+                <div className="row"><span>Desconto (10%)</span><span>-{formatarMoeda(valoresPix.desconto)}</span></div>
+                <div className="row"><span>Total com desconto</span><span>{formatarMoeda(valoresPix.total)}</span></div>
+                <div className="row total"><span>Saldo restante</span><span>{formatarMoeda(valoresPix.restante)}</span></div>
+              </>
+            ) : (
+              <div className="row total"><span>Total integral</span><span>{formatarMoeda(valoresPix.original)}</span></div>
+            )}
           </div>
+
+          {dados.profissional?.chavePix ? (
+            <>
+              <div className="form-group" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <input
+                  id="usarSinalPix"
+                  type="checkbox"
+                  checked={usarSinalPix}
+                  onChange={e => {
+                    setUsarSinalPix(e.target.checked);
+                    setAceiteSinal(false);
+                    setMensagemPix('');
+                  }}
+                  style={{ marginTop: 4 }}
+                />
+                <label htmlFor="usarSinalPix" style={{ margin: 0, fontWeight: 400 }}>
+                  Quero pagar 50% do valor adiantado via PIX e ganhar 10% de desconto.
+                </label>
+              </div>
+              {usarSinalPix && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="chavePix">Chave PIX do profissional</label>
+                    <input
+                      id="chavePix"
+                      readOnly
+                      value={dados.profissional.chavePix}
+                      onClick={e => e.target.select()}
+                    />
+                    <button type="button" className="btn btn-outline" onClick={copiarChavePix}>Copiar PIX</button>
+                    {mensagemPix && <p role="status">{mensagemPix}</p>}
+                  </div>
+                  <div className="form-group" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <input
+                      id="aceiteSinal"
+                      type="checkbox"
+                      checked={aceiteSinal}
+                      onChange={e => setAceiteSinal(e.target.checked)}
+                      required
+                      style={{ marginTop: 4 }}
+                    />
+                    <label htmlFor="aceiteSinal" style={{ margin: 0, fontWeight: 400 }}>
+                      Confirmo e me comprometo a pagar 50% do valor para garantir meu agendamento e estou ciente que em caso de falta, sem justificativa, o valor não será reembolsado.
+                    </label>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="form-error" role="status">
+              O PIX não está disponível para este profissional. O agendamento será feito pelo valor integral.
+            </p>
+          )}
 
           <div className="form-group">
             <label>Nome completo *</label>

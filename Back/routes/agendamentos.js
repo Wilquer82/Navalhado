@@ -40,6 +40,8 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const nomeCliente = String(body.nomeCliente || cliente.nome || '').trim();
   const telefoneCliente = String(body.telefoneCliente || cliente.telefone || body.telefone || '').trim();
   const pushSubscription = body.pushSubscription;
+  const usarSinalPix = body.usarSinalPix === true;
+  const aceiteSinal = body.aceiteSinal === true;
   if (!profissionalId || !servicoId || !data || !horarioInicio || !nomeCliente || !telefoneCliente) {
     return respostaErro(res, 400, 'Preencha todos os campos obrigatórios.');
   }
@@ -54,7 +56,25 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
   const vinculo = await servicoDoProfissional(profissional, servicoId);
   if (!vinculo) return respostaErro(res, 400, 'Serviço não atendido por este profissional.');
+  if (usarSinalPix && !String(profissional.chavePix || '').trim()) {
+    return respostaErro(res, 400, 'Este profissional ainda não cadastrou uma chave PIX.');
+  }
+  if (usarSinalPix && !aceiteSinal) {
+    return respostaErro(res, 400, 'Confirme o compromisso de pagamento do sinal para continuar.');
+  }
   const duracao = vinculo.vinculo.duracaoMinutos;
+  const valorOriginalCentavos = Math.round(Number(vinculo.vinculo.preco) * 100);
+  const valorSinalCentavos = usarSinalPix ? Math.round(valorOriginalCentavos / 2) : 0;
+  const descontoCentavos = usarSinalPix ? Math.round(valorOriginalCentavos / 10) : 0;
+  const pagamento = {
+    tipo: usarSinalPix ? 'sinal_pix' : 'integral',
+    valorOriginal: valorOriginalCentavos / 100,
+    valorSinal: valorSinalCentavos / 100,
+    desconto: descontoCentavos / 100,
+    valorFinal: (valorOriginalCentavos - descontoCentavos) / 100,
+    valorRestante: (valorOriginalCentavos - descontoCentavos - valorSinalCentavos) / 100,
+    aceiteSinal
+  };
   const validacao = await validarAgendamento({ profissionalId, servicoId, data, horarioInicio, duracaoMinutos: duracao });
   if (validacao.erro) return respostaErro(res, 400, validacao.erro);
   const agendamento = new Appointment({
@@ -68,6 +88,7 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
     pushSubscription,
     nomeCliente,
     telefoneCliente,
+    pagamento,
     status: 'pendente',
     tokenConfirmacao: require('crypto').randomBytes(24).toString('hex')
   });
@@ -78,7 +99,11 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
     throw error;
   }
   const links = await linksNotificacao(agendamento, profissional, vinculo.servico);
-  res.status(201).json({ ...serializarAgendamento(agendamento, profissional, vinculo.servico), ...links });
+  res.status(201).json({
+    ...serializarAgendamento(agendamento, profissional, vinculo.servico),
+    ...(usarSinalPix ? { chavePix: profissional.chavePix } : {}),
+    ...links
+  });
 }));
 
 router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res) => {

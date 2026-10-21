@@ -135,13 +135,14 @@ export default function Painel() {
     const dataFormatada = new Date(agendamento.data + 'T00:00:00').toLocaleDateString('pt-BR', {
       weekday: 'long', day: 'numeric', month: 'long'
     });
+    const valor = agendamento.pagamento?.valorFinal ?? agendamento.servico?.preco ?? agendamento.preco;
     const mensagem = `Olá ${agendamento.nomeCliente}! 👋\n\n` +
       `Confirmamos seu agendamento no Navalhado Cortes:\n\n` +
       `💈 Serviço: ${agendamento.servico}\n` +
       `👤 Profissional: ${agendamento.profissional}\n` +
       `📅 Data: ${dataFormatada}\n` +
       `⏰ Horário: ${agendamento.horario}\n` +
-      `💰 Valor: R$ ${agendamento.preco}\n\n` +
+      `💰 Valor: R$ ${valor}\n\n` +
       `Aguardamos você! 💈✨`;
     const telefone = agendamento.telefone.replace(/\D/g, '');
     const url = `https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`;
@@ -385,6 +386,13 @@ export default function Painel() {
                     </div>
                     <div className="cliente">👤 {a.nomeCliente}</div>
                     <div className="cliente">📞 {a.telefone}</div>
+                    {a.pagamento?.tipo === 'sinal_pix' ? (
+                      <div className="cliente">
+                        💠 Sinal PIX: R$ {a.pagamento.valorSinal} · Desconto: R$ {a.pagamento.desconto} · Saldo: R$ {a.pagamento.valorRestante}
+                      </div>
+                    ) : a.pagamento?.valorFinal !== undefined && (
+                      <div className="cliente">💰 Valor integral: R$ {a.pagamento.valorFinal}</div>
+                    )}
                     {a.observacoes && <div className="serv">📝 {a.observacoes}</div>}
                     <div className="actions">
                       <button className="whats-btn" onClick={() => enviarWhatsApp(a)}>💬 WhatsApp</button>
