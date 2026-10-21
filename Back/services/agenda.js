@@ -86,7 +86,18 @@ async function horariosDisponiveis(profissional, data, servicoId, config) {
   if (!vinculo) return [];
   const expediente = horarioDoProfissional(profissional, data, config);
   if (folga(profissional, data) || !expediente) return [];
-  const ocupados = await Appointment.find({ profissionalId: profissional._id, data: intervaloData(data), status: { $ne: 'cancelado' } });
+  const dia = diaSemana(data);
+  const [ocupados, bloqueios] = await Promise.all([
+    Appointment.find({ profissionalId: profissional._id, data: intervaloData(data), status: { $ne: 'cancelado' } }),
+    Bloqueio.find({
+      profissionalId: profissional._id,
+      ativo: true,
+      $or: [
+        { recorrente: true, diaSemana: dia },
+        { recorrente: { $ne: true }, data }
+      ]
+    })
+  ]);
   const duracao = vinculo.vinculo.duracaoMinutos;
   const intervalo = config.duracaoIntervaloEntre;
   const inicioExpediente = minutos(expediente.inicio);
@@ -96,7 +107,11 @@ async function horariosDisponiveis(profissional, data, servicoId, config) {
     const fim = inicio + duracao;
     const horarioInicio = horario(inicio);
     const horarioFim = horario(fim);
-    const bloqueado = await verificarBloqueios(profissional._id, data, horarioInicio, horarioFim);
+    const bloqueado = bloqueios.some(bloqueio =>
+      !bloqueio.horarioInicio
+      || !bloqueio.horarioFim
+      || horariosSobrepostos(horarioInicio, horarioFim, bloqueio.horarioInicio, bloqueio.horarioFim)
+    );
     if (bloqueado) continue;
     const conflita = ocupados.some(item => horariosSobrepostos(inicio, fim, minutos(item.horarioInicio), minutos(item.horarioFim) + intervalo));
     if (!conflita) livres.push({ horarioInicio, horarioFim });
