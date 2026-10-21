@@ -125,15 +125,22 @@ async function validarAgendamento({ profissionalId, servicoId, data, horarioInic
 
 function serializarAgendamento(agendamento, profissional, servico) {
   const obj = agendamento.toObject ? agendamento.toObject() : agendamento;
+  const dadosPublicos = { ...obj };
+  delete dadosPublicos.pushSubscription;
+  delete dadosPublicos.inicioEm;
+  delete dadosPublicos.lembreteEm;
+  delete dadosPublicos.lembreteStatus;
+  delete dadosPublicos.lembreteTentativas;
+  delete dadosPublicos.lembreteEnviadoEm;
   return {
-    ...obj,
-    data: formatarDataAPI(obj.data),
-    horario: obj.horarioInicio,
-    telefone: obj.telefoneCliente,
-    cliente: { nome: obj.nomeCliente, telefone: obj.telefoneCliente },
+    ...dadosPublicos,
+    data: formatarDataAPI(dadosPublicos.data),
+    horario: dadosPublicos.horarioInicio,
+    telefone: dadosPublicos.telefoneCliente,
+    cliente: { nome: dadosPublicos.nomeCliente, telefone: dadosPublicos.telefoneCliente },
     profissional: profissional ? { _id: profissional._id, nome: profissional.nome } : obj.profissionalId,
-    servico: servico ? { _id: servico._id, nome: servico.nome, preco: servico.preco, duracaoMinutos: servico.duracaoMinutos, duracao: servico.duracaoMinutos } : obj.servicoId,
-    observacoes: obj.observacoes || ''
+    servico: servico ? { _id: servico._id, nome: servico.nome, preco: servico.preco, duracaoMinutos: servico.duracaoMinutos, duracao: servico.duracaoMinutos } : dadosPublicos.servicoId,
+    observacoes: dadosPublicos.observacoes || ''
   };
 }
 

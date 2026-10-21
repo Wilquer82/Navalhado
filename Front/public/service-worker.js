@@ -1,4 +1,4 @@
-const CACHE = 'navalhado-v2';
+const CACHE = 'navalhado-v3';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -25,4 +25,25 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request))
   );
+});
+
+self.addEventListener('push', e => {
+  if (!e.data) return;
+  const mensagem = e.data.json();
+  e.waitUntil(self.registration.showNotification(mensagem.title, {
+    body: mensagem.body,
+    icon: '/Logo.webp',
+    badge: '/Logo.webp',
+    data: { url: mensagem.url || '/' }
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const destino = new URL(e.notification.data?.url || '/', self.location.origin).href;
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(janelas => {
+    const existente = janelas.find(janela => janela.url === destino);
+    if (existente) return existente.focus();
+    return clients.openWindow(destino);
+  }));
 });

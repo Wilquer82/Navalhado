@@ -14,6 +14,22 @@ const router = express.Router();
 
 const respostaErro = (res, status, mensagem) => res.status(status).json({ erro: mensagem });
 
+function assinaturaPushValida(assinatura) {
+  if (!assinatura) return true;
+  if (!assinatura.endpoint || !assinatura.keys?.p256dh || !assinatura.keys?.auth) return false;
+  try {
+    const url = new URL(assinatura.endpoint);
+    const hostPermitido = url.hostname === 'fcm.googleapis.com'
+      || url.hostname === 'web.push.apple.com'
+      || url.hostname === 'push.services.mozilla.com'
+      || url.hostname.endsWith('.push.services.mozilla.com')
+      || url.hostname.endsWith('.notify.windows.com');
+    return url.protocol === 'https:' && !url.port && !url.username && !url.password && hostPermitido;
+  } catch {
+    return false;
+  }
+}
+
 router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const body = req.body || {};
   const profissionalId = body.profissionalId;
@@ -23,8 +39,12 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const cliente = body.cliente || {};
   const nomeCliente = String(body.nomeCliente || cliente.nome || '').trim();
   const telefoneCliente = String(body.telefoneCliente || cliente.telefone || body.telefone || '').trim();
+  const pushSubscription = body.pushSubscription;
   if (!profissionalId || !servicoId || !data || !horarioInicio || !nomeCliente || !telefoneCliente) {
     return respostaErro(res, 400, 'Preencha todos os campos obrigatórios.');
+  }
+  if (!assinaturaPushValida(pushSubscription)) {
+    return respostaErro(res, 400, 'Assinatura de notificações inválida.');
   }
   if (!validarNome(nomeCliente)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
   if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
@@ -43,6 +63,9 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
     data: dataBanco(data),
     horarioInicio,
     horarioFim: horario(minutos(horarioInicio) + duracao),
+    inicioEm: new Date(`${data}T${horarioInicio}:00-03:00`),
+    lembreteEm: new Date(new Date(`${data}T${horarioInicio}:00-03:00`).getTime() - 15 * 60 * 1000),
+    pushSubscription,
     nomeCliente,
     telefoneCliente,
     status: 'pendente',

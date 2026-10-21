@@ -10,6 +10,29 @@ const dataLocalISO = data => {
   return `${ano}-${mes}-${dia}`;
 };
 
+const chaveVapidParaBytes = chave => {
+  const base64 = chave.replace(/-/g, '+').replace(/_/g, '/');
+  const preenchida = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  return Uint8Array.from(window.atob(preenchida), caractere => caractere.charCodeAt(0));
+};
+
+async function assinarNotificacoes() {
+  const chave = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+  if (!chave || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return null;
+
+  let permissao = Notification.permission;
+  if (permissao === 'default') permissao = await Notification.requestPermission();
+  if (permissao !== 'granted') return null;
+
+  const registro = await navigator.serviceWorker.ready;
+  const assinatura = await registro.pushManager.getSubscription()
+    || await registro.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: chaveVapidParaBytes(chave)
+    });
+  return assinatura.toJSON();
+}
+
 export default function Agendar() {
   const [step, setStep] = useState(1);
   const [dados, setDados] = useState({});
@@ -150,6 +173,13 @@ export default function Agendar() {
       return;
     }
     try {
+      let pushSubscription = null;
+      try {
+        pushSubscription = await assinarNotificacoes();
+      } catch (error) {
+        console.warn('Não foi possível ativar os lembretes por notificação:', error);
+      }
+
       const res = await fetch(`${API}/agendamentos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,13 +189,14 @@ export default function Agendar() {
           data: dados.data,
           horarioInicio: dados.horario,
           nomeCliente: dados.nomeCliente,
-          telefoneCliente: telefone
+          telefoneCliente: telefone,
+          pushSubscription
         })
       });
 
       const resposta = await res.json();
       if (!res.ok) throw new Error(resposta.erro || 'Erro ao agendar. Tente novamente.');
-      setDados({ ...dados, whatsappCliente: resposta.whatsappCliente });
+      setDados({ ...dados, whatsappCliente: resposta.whatsappCliente, lembreteAtivado: Boolean(pushSubscription) });
       setSucesso(true);
     } catch (e) {
       setErroAgendamento(e.message || 'Não foi possível concluir o agendamento.');
@@ -207,6 +238,9 @@ export default function Agendar() {
           })} às {dados.horario}
         </p>
         <p>Aguarde confirmação do profissional.</p>
+        {dados.lembreteAtivado
+          ? <p>Você receberá uma notificação do navegador 15 minutos antes, após a confirmação do agendamento.</p>
+          : <p>As notificações não foram ativadas neste dispositivo; você não receberá o lembrete automático.</p>}
         {dados.whatsappCliente && <a className="btn" href={dados.whatsappCliente} target="_blank" rel="noreferrer">Enviar mensagem no WhatsApp</a>}
         <button className="btn btn-outline" onClick={reiniciar}>Novo agendamento</button>
       </div>

@@ -10,6 +10,7 @@ const Servico = require('./models/Servico');
 const ConfiguracaoGeral = require('./models/ConfiguracaoGeral');
 const User = require('./models/User');
 const Appointment = require('./models/Appointment');
+const { iniciarAgendadorLembretes } = require('./services/lembretes');
 
 const TIME_ZONE = 'America/Sao_Paulo';
 const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
@@ -196,6 +197,7 @@ async function iniciar() {
     console.log('✅ Conectado ao MongoDB');
     await migrarDadosLegados();
     await garantirDadosIniciais();
+    iniciarAgendadorLembretes();
   }
   
   app.listen(PORT, () => console.log(`🚀 API na porta ${PORT}`));

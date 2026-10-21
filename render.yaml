@@ -26,6 +26,12 @@ services:
         value: Profissional Navalhado
       - key: PROFISSIONAL_TELEFONE
         value: ""
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:contato@navalhado.com
 
   - type: static
     name: navalhado-web
@@ -39,3 +45,5 @@ services:
     envVars:
       - key: VITE_API
         value: https://navalhadoback.onrender.com/api
+      - key: VITE_VAPID_PUBLIC_KEY
+        sync: false
