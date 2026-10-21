@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { baixarEventoICalendar, criarEventoCalendario } from '../utils/calendario';
 
 const API = import.meta.env.VITE_API || 'https://navalhadoback.onrender.com/api';
 
@@ -124,6 +125,15 @@ export default function Agendar() {
   const profissionalId = dados.profissional?._id;
   const servicoId = dados.servico?._id;
   const valoresPix = calcularSinalPix(dados.servico?.preco);
+  const eventoCalendario = sucesso && dados.servico
+    ? criarEventoCalendario({
+      data: dados.data,
+      horario: dados.horario,
+      duracaoMinutos: dados.servico.duracaoMinutos,
+      profissional: dados.profissional.nome,
+      servico: dados.servico.nome
+    })
+    : null;
 
   useEffect(() => {
     if (!dataSel || !profissionalId || !servicoId) {
@@ -350,6 +360,21 @@ export default function Agendar() {
             ) : (
               <div className="row total"><span>Valor integral</span><span>{formatarMoeda(dados.pagamento.valorFinal)}</span></div>
             )}
+          </div>
+        )}
+        {eventoCalendario && (
+          <div className="calendar-actions">
+            <a className="btn" href={eventoCalendario.urlGoogle} target="_blank" rel="noreferrer">
+              Adicionar ao Google Agenda
+            </a>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => baixarEventoICalendar(eventoCalendario.ics)}
+            >
+              Adicionar ao Calendário do iPhone
+            </button>
+            <p>O arquivo para iPhone inclui lembrete 15 minutos antes; o Google Agenda usa os alertas padrão da sua conta. O evento ficará como solicitação até a confirmação do profissional.</p>
           </div>
         )}
         <p>{textoLembreteSucesso()}</p>

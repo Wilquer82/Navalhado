@@ -159,6 +159,22 @@ export default function Painel() {
     } catch (e) { alert(e.message); }
   };
 
+  const confirmarSinalPix = async agendamento => {
+    if (!confirm(`Confirma que recebeu o sinal PIX de R$ ${agendamento.pagamento.valorSinal}?`)) return;
+    try {
+      await apiFetch(`${API}/agendamentos/${agendamento._id}/sinal-pix`, { method: 'PUT' });
+      carregarAgendamentos();
+    } catch (e) { alert(e.message); }
+  };
+
+  const excluirSinalPendente = async agendamento => {
+    if (!confirm(`Excluir o agendamento de ${agendamento.nomeCliente} porque o sinal PIX não foi recebido?`)) return;
+    try {
+      await apiFetch(`${API}/agendamentos/${agendamento._id}/sinal-pendente`, { method: 'DELETE' });
+      carregarAgendamentos();
+    } catch (e) { alert(e.message); }
+  };
+
   // ===== PROFISSIONAIS =====
   const salvarProfissional = async e => {
     e.preventDefault();
@@ -387,9 +403,17 @@ export default function Painel() {
                     <div className="cliente">👤 {a.nomeCliente}</div>
                     <div className="cliente">📞 {a.telefone}</div>
                     {a.pagamento?.tipo === 'sinal_pix' ? (
-                      <div className="cliente">
-                        💠 Sinal PIX: R$ {a.pagamento.valorSinal} · Desconto: R$ {a.pagamento.desconto} · Saldo: R$ {a.pagamento.valorRestante}
-                      </div>
+                      <>
+                        <div className="cliente">
+                          💠 Sinal PIX R$ {a.pagamento.valorSinal} · {a.pagamento.statusSinal === 'recebido' ? 'Recebido' : 'Pendente'} · Desconto: R$ {a.pagamento.desconto} · Saldo: R$ {a.pagamento.valorRestante}
+                        </div>
+                        {a.pagamento.statusSinal !== 'recebido' && (
+                          <div className="actions">
+                            <button className="whats-btn" onClick={() => confirmarSinalPix(a)}>Confirmar PIX recebido</button>
+                            <button className="cancel-btn" onClick={() => excluirSinalPendente(a)}>Excluir sem pagamento</button>
+                          </div>
+                        )}
+                      </>
                     ) : a.pagamento?.valorFinal !== undefined && (
                       <div className="cliente">💰 Valor integral: R$ {a.pagamento.valorFinal}</div>
                     )}

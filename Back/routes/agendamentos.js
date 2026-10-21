@@ -134,6 +134,38 @@ router.get('/', autenticar, asyncHandler(async (req, res) => {
   res.json(agendamentos.map(a => serializarAgendamento(a, a.profissionalId, a.servicoId)));
 }));
 
+router.put('/:id/sinal-pix', autenticar, asyncHandler(async (req, res) => {
+  const agendamento = await Appointment.findOneAndUpdate(
+    {
+      _id: req.params.id,
+      profissionalId: req.auth.profissionalId,
+      status: { $ne: 'cancelado' },
+      'pagamento.tipo': 'sinal_pix',
+      'pagamento.statusSinal': { $ne: 'recebido' }
+    },
+    { $set: { 'pagamento.statusSinal': 'recebido' } },
+    { new: true }
+  ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
+  if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado ou sinal já confirmado.');
+  res.json(serializarAgendamento(agendamento, agendamento.profissionalId, agendamento.servicoId));
+}));
+
+router.delete('/:id/sinal-pendente', autenticar, asyncHandler(async (req, res) => {
+  const agendamento = await Appointment.findOneAndUpdate(
+    {
+      _id: req.params.id,
+      profissionalId: req.auth.profissionalId,
+      status: { $ne: 'cancelado' },
+      'pagamento.tipo': 'sinal_pix',
+      'pagamento.statusSinal': { $ne: 'recebido' }
+    },
+    { $set: { status: 'cancelado' } },
+    { new: true }
+  );
+  if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado ou sinal já recebido.');
+  res.json({ mensagem: 'Agendamento sem sinal recebido excluído.' });
+}));
+
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
   const agendamento = await Appointment.findByIdAndDelete(req.params.id);
   if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');

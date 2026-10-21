@@ -21,6 +21,7 @@ const appointmentSchema = new mongoose.Schema({
     desconto: { type: Number, min: 0, default: 0 },
     valorFinal: { type: Number, min: 0 },
     valorRestante: { type: Number, min: 0 },
+    statusSinal: { type: String, enum: ['pendente', 'recebido'], default: 'pendente' },
     aceiteSinal: { type: Boolean, default: false }
   },
   observacoes: { type: String, default: '' },
