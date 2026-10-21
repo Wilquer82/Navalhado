@@ -5,6 +5,7 @@ const profissionalSchema = new mongoose.Schema({
   foto: { type: String, default: '' },
   descricao: { type: String, default: 'Geral' },
   telefone: { type: String, default: '' },
+  chavePix: { type: String, default: '' },
   servicos: [{
     servicoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Servico', required: true },
     preco: { type: Number, required: true, min: 0 },

@@ -9,22 +9,23 @@ const router = express.Router();
 
 const respostaErro = (res, status, mensagem) => res.status(status).json({ erro: mensagem });
 
-const serializarProfissional = (p) => ({
+const serializarProfissional = (p, incluirPix = false) => ({
   _id: p._id,
   nome: p.nome,
   foto: p.foto,
   descricao: p.descricao,
   especialidade: p.descricao,
   telefone: p.telefone,
+  ...(incluirPix ? { chavePix: p.chavePix } : {}),
   servicos: p.servicos,
   horarioTrabalho: Object.fromEntries(p.horarioTrabalho || {}),
   folgas: p.folgas,
   ativo: p.ativo
 });
 
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const profissionais = await Profissional.find({ ativo: true }).select('-usuario.senhaHash').sort({ nome: 1 });
-  res.json(profissionais.map(serializarProfissional));
+  res.json(profissionais.map(p => serializarProfissional(p, Boolean(req.auth))));
 }));
 
 router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) => {
@@ -52,13 +53,14 @@ router.get('/:id/horarios-disponiveis', autenticarOpcional, asyncHandler(async (
 }));
 
 router.post('/', autenticar, asyncHandler(async (req, res) => {
-  const { nome, foto, descricao, especialidade, telefone, servicos } = req.body;
+  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body;
   if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
   const profissional = new Profissional({
     nome: String(nome).trim(),
     foto: String(foto || ''),
     descricao: String(descricao || especialidade || 'Geral'),
     telefone: String(telefone || ''),
+    chavePix: String(chavePix || '').trim(),
     servicos: Array.isArray(servicos) ? servicos.map(s => ({
       servicoId: s.servicoId,
       preco: Number(s.preco),
@@ -66,13 +68,13 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
     })) : []
   });
   await profissional.save();
-  res.status(201).json(serializarProfissional(profissional));
+  res.status(201).json(serializarProfissional(profissional, true));
 }));
 
 router.put('/:id', autenticar, asyncHandler(async (req, res) => {
   const profissional = await Profissional.findById(req.params.id);
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
-  const { nome, foto, descricao, especialidade, telefone, servicos } = req.body;
+  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body;
   if (nome !== undefined) {
     if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
     profissional.nome = String(nome).trim();
@@ -82,6 +84,7 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
     profissional.descricao = String(descricao || especialidade || 'Geral');
   }
   if (telefone !== undefined) profissional.telefone = String(telefone);
+  if (chavePix !== undefined) profissional.chavePix = String(chavePix).trim();
   if (Array.isArray(servicos)) {
     profissional.servicos = servicos.map(s => ({
       servicoId: s.servicoId,
@@ -90,7 +93,7 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
     }));
   }
   await profissional.save();
-  res.json(serializarProfissional(profissional));
+  res.json(serializarProfissional(profissional, true));
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {

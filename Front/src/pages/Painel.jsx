@@ -23,7 +23,7 @@ export default function Painel() {
   const nav = useNavigate();
 
   // Formulários
-  const [formProf, setFormProf] = useState({ nome: '', especialidade: '' });
+  const [formProf, setFormProf] = useState({ nome: '', especialidade: '', telefone: '', chavePix: '' });
   const [formServ, setFormServ] = useState({ nome: '', duracao: '', preco: '' });
   const [formBloq, setFormBloq] = useState({
     profissional: '', tipo: 'dia-semana', data: '',
@@ -178,7 +178,7 @@ export default function Painel() {
       alert(e.message);
       return;
     }
-    setFormProf({ nome: '', especialidade: '' });
+    setFormProf({ nome: '', especialidade: '', telefone: '', chavePix: '' });
     setEditandoProf(null);
     carregarProfissionais();
     setTimeout(() => setMsg(''), 3000);
@@ -186,7 +186,12 @@ export default function Painel() {
 
   const editarProfissional = p => {
     setEditandoProf(p);
-    setFormProf({ nome: p.nome, especialidade: p.especialidade });
+    setFormProf({
+      nome: p.nome,
+      especialidade: p.especialidade,
+      telefone: p.telefone || '',
+      chavePix: p.chavePix || ''
+    });
   };
 
   const excluirProfissional = async p => {
@@ -408,6 +413,12 @@ export default function Painel() {
             <input placeholder="Especialidade" value={formProf.especialidade}
               onChange={e => setFormProf({ ...formProf, especialidade: e.target.value })}
               required style={inputStyle} />
+            <input type="tel" placeholder="Telefone celular" value={formProf.telefone}
+              onChange={e => setFormProf({ ...formProf, telefone: e.target.value })}
+              style={inputStyle} />
+            <input placeholder="Chave PIX" value={formProf.chavePix}
+              onChange={e => setFormProf({ ...formProf, chavePix: e.target.value })}
+              style={inputStyle} />
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="submit" style={{
                 flex: 1, padding: 12, background: '#2d2d2d', color: '#fff',
@@ -415,7 +426,8 @@ export default function Painel() {
               }}>{editandoProf ? 'Atualizar' : 'Adicionar'}</button>
               {editandoProf && (
                 <button type="button" onClick={() => {
-                  setEditandoProf(null); setFormProf({ nome: '', especialidade: '' });
+                  setEditandoProf(null);
+                  setFormProf({ nome: '', especialidade: '', telefone: '', chavePix: '' });
                 }} style={{ padding: 12, background: '#eee', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                   Cancelar
                 </button>
@@ -429,6 +441,8 @@ export default function Painel() {
             <div key={p._id} className="appointment-item">
               <div className="top"><span className="prof">{p.nome}</span></div>
               <div className="cliente">🎯 {p.especialidade}</div>
+              {p.telefone && <div className="cliente">📱 {p.telefone}</div>}
+              {p.chavePix && <div className="cliente">💠 PIX: {p.chavePix}</div>}
               <div className="actions">
                 <button onClick={() => editarProfissional(p)} style={{
                   background: '#e3f2fd', color: '#1565c0', border: 'none',

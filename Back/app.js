@@ -58,7 +58,7 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 // Rota pública de dados
 app.get('/api/dados', async (req, res) => {
   const Profissional = mongoose.model('Profissional');
-  res.json({ profissionais: await Profissional.find({ ativo: true }).select('-usuario.senhaHash') });
+  res.json({ profissionais: await Profissional.find({ ativo: true }).select('-usuario.senhaHash -chavePix') });
 });
 
 // Tratamento 404 — SEMPRE por último
