@@ -16,13 +16,26 @@ const chaveVapidParaBytes = chave => {
   return Uint8Array.from(window.atob(preenchida), caractere => caractere.charCodeAt(0));
 };
 
+async function obterChaveVapidPublica() {
+  const doEnv = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+  if (doEnv) return doEnv;
+  const res = await fetch(`${API}/push/vapid-public-key`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.publicKey || null;
+}
+
 async function assinarNotificacoes() {
-  const chave = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-  if (!chave || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return null;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    return { assinatura: null, motivo: 'navegador' };
+  }
+
+  const chave = await obterChaveVapidPublica();
+  if (!chave) return { assinatura: null, motivo: 'servidor' };
 
   let permissao = Notification.permission;
   if (permissao === 'default') permissao = await Notification.requestPermission();
-  if (permissao !== 'granted') return null;
+  if (permissao !== 'granted') return { assinatura: null, motivo: 'permissao' };
 
   const registro = await navigator.serviceWorker.ready;
   const assinatura = await registro.pushManager.getSubscription()
@@ -30,7 +43,7 @@ async function assinarNotificacoes() {
       userVisibleOnly: true,
       applicationServerKey: chaveVapidParaBytes(chave)
     });
-  return assinatura.toJSON();
+  return { assinatura: assinatura.toJSON(), motivo: null };
 }
 
 export default function Agendar() {
@@ -47,8 +60,8 @@ export default function Agendar() {
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [erroHorarios, setErroHorarios] = useState('');
   const [erroAgendamento, setErroAgendamento] = useState('');
+  const [querLembrete, setQuerLembrete] = useState(true);
 
-  // Carregar dados iniciais
   useEffect(() => {
     const controller = new AbortController();
 
@@ -71,7 +84,6 @@ export default function Agendar() {
     return () => controller.abort();
   }, []);
 
-  // Gerar 14 dias corridos, distribuídos em duas semanas
   const gerarDatas = () => {
     const arr = [];
     const hoje = new Date();
@@ -88,7 +100,6 @@ export default function Agendar() {
     setDatas(arr);
   };
 
-  // O servidor calcula disponibilidade usando o serviço escolhido.
   const profissionalId = dados.profissional?._id;
   const servicoId = dados.servico?._id;
 
@@ -174,10 +185,18 @@ export default function Agendar() {
     }
     try {
       let pushSubscription = null;
-      try {
-        pushSubscription = await assinarNotificacoes();
-      } catch (error) {
-        console.warn('Não foi possível ativar os lembretes por notificação:', error);
+      let motivoLembrete = null;
+      if (querLembrete) {
+        try {
+          const resultado = await assinarNotificacoes();
+          pushSubscription = resultado.assinatura;
+          motivoLembrete = resultado.motivo;
+        } catch (error) {
+          console.warn('Não foi possível ativar os lembretes por notificação:', error);
+          motivoLembrete = 'erro';
+        }
+      } else {
+        motivoLembrete = 'recusado';
       }
 
       const res = await fetch(`${API}/agendamentos`, {
@@ -196,7 +215,12 @@ export default function Agendar() {
 
       const resposta = await res.json();
       if (!res.ok) throw new Error(resposta.erro || 'Erro ao agendar. Tente novamente.');
-      setDados({ ...dados, whatsappCliente: resposta.whatsappCliente, lembreteAtivado: Boolean(pushSubscription) });
+      setDados({
+        ...dados,
+        whatsappCliente: resposta.whatsappCliente,
+        lembreteAtivado: Boolean(pushSubscription),
+        motivoLembrete
+      });
       setSucesso(true);
     } catch (e) {
       setErroAgendamento(e.message || 'Não foi possível concluir o agendamento.');
@@ -211,6 +235,23 @@ export default function Agendar() {
     setDataSel('');
     setSucesso(false);
     setErroAgendamento('');
+    setQuerLembrete(true);
+  };
+
+  const textoLembreteSucesso = () => {
+    if (dados.lembreteAtivado) {
+      return 'Lembrete ativado: você receberá uma notificação neste aparelho 15 minutos antes do horário, depois que o profissional confirmar.';
+    }
+    if (dados.motivoLembrete === 'permissao') {
+      return 'As notificações foram bloqueadas neste navegador. Ative-as nas configurações do site se quiser o lembrete de 15 minutos.';
+    }
+    if (dados.motivoLembrete === 'servidor' || dados.motivoLembrete === 'erro') {
+      return 'Não foi possível ativar o lembrete automático neste momento. Você ainda pode anotar o horário.';
+    }
+    if (dados.motivoLembrete === 'navegador') {
+      return 'Este navegador não suporta notificações push. No celular, use Chrome ou Safari atualizado.';
+    }
+    return 'Lembrete automático não foi solicitado.';
   };
 
   if (sucesso) {
@@ -218,9 +259,9 @@ export default function Agendar() {
       <div className="success">
         <div className="header">
           <div className="logo-container">
-            <img 
-              src="/Logo.webp" 
-              alt="Logo Navalhado Cortes" 
+            <img
+              src="/Logo.webp"
+              alt="Logo Navalhado Cortes"
               className="logo-img"
               onError={(e) => { e.target.style.display = 'none'; }}
             />
@@ -238,9 +279,7 @@ export default function Agendar() {
           })} às {dados.horario}
         </p>
         <p>Aguarde confirmação do profissional.</p>
-        {dados.lembreteAtivado
-          ? <p>Você receberá uma notificação do navegador 15 minutos antes, após a confirmação do agendamento.</p>
-          : <p>As notificações não foram ativadas neste dispositivo; você não receberá o lembrete automático.</p>}
+        <p>{textoLembreteSucesso()}</p>
         {dados.whatsappCliente && <a className="btn" href={dados.whatsappCliente} target="_blank" rel="noreferrer">Enviar mensagem no WhatsApp</a>}
         <button className="btn btn-outline" onClick={reiniciar}>Novo agendamento</button>
       </div>
@@ -251,9 +290,9 @@ export default function Agendar() {
     <>
       <div className="header">
         <div className="logo-container">
-          <img 
-            src="/Logo.webp" 
-            alt="Logo Navalhado Cortes" 
+          <img
+            src="/Logo.webp"
+            alt="Logo Navalhado Cortes"
             className="logo-img"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
@@ -279,7 +318,6 @@ export default function Agendar() {
         </div>
       </div>
 
-      {/* STEP 1: Profissional */}
       {step === 1 && (
         <>
           <div className="section-title">Escolha o profissional</div>
@@ -307,7 +345,6 @@ export default function Agendar() {
         </>
       )}
 
-      {/* STEP 2: Serviço */}
       {step === 2 && (
         <>
           <div className="section-title">Escolha o serviço</div>
@@ -326,7 +363,6 @@ export default function Agendar() {
         </>
       )}
 
-      {/* STEP 3: Data e Horário */}
       {step === 3 && (
         <>
           <div className="section-title">Escolha a data</div>
@@ -389,7 +425,6 @@ export default function Agendar() {
         </>
       )}
 
-      {/* STEP 4: Dados do cliente */}
       {step === 4 && (
         <form onSubmit={confirmar}>
           <div className="section-title">Confirme seus dados</div>
@@ -418,6 +453,19 @@ export default function Agendar() {
             }} required placeholder="(11) 99999-9999" />
           </div>
 
+          <div className="form-group" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <input
+              id="querLembrete"
+              type="checkbox"
+              checked={querLembrete}
+              onChange={e => setQuerLembrete(e.target.checked)}
+              style={{ marginTop: 4 }}
+            />
+            <label htmlFor="querLembrete" style={{ margin: 0, fontWeight: 400 }}>
+              Receber lembrete neste aparelho <strong>15 minutos antes</strong> (notificação do navegador, sem custo de WhatsApp).
+            </label>
+          </div>
+
           <button type="submit" className="btn" disabled={carregando}>
             {carregando ? 'Agendando...' : '✓ Confirmar agendamento'}
           </button>
@@ -427,9 +475,9 @@ export default function Agendar() {
         </form>
       )}
 
-      <div style={{ 
-        display: 'flex', justifyContent: 'center', gap: 20, 
-        padding: '20px', fontSize: 12 
+      <div style={{
+        display: 'flex', justifyContent: 'center', gap: 20,
+        padding: '20px', fontSize: 12
       }}>
         <a href="/sobre" style={{ color: '#999', textDecoration: 'none' }}>
           ℹ️ Sobre o salão
