@@ -29,6 +29,12 @@ export default function Login() {
 
       if (!dado.token) throw new Error('Resposta de login inválida.');
       localStorage.setItem('token', dado.token);
+      if (dado.profissional?.nome) {
+        localStorage.setItem('profissionalNome', dado.profissional.nome);
+      }
+      if (dado.profissional?.id) {
+        localStorage.setItem('profissionalId', dado.profissional.id);
+      }
       nav('/painel', { replace: true });
     } catch (e) {
       setErro(e.message || 'Não foi possível conectar ao servidor.');
