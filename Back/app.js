@@ -10,6 +10,8 @@ require('./models/Servico');
 require('./models/ConfiguracaoGeral');
 require('./models/User');
 require('./models/Bloqueio');
+require('./models/Produto');
+require('./models/Venda');
 
 // Rotas
 const authRoutes = require('./routes/auth');
@@ -18,6 +20,8 @@ const servicosRoutes = require('./routes/servicos');
 const bloqueiosRoutes = require('./routes/bloqueios');
 const agendamentosRoutes = require('./routes/agendamentos');
 const profissionalRoutes = require('./routes/profissional');
+const produtosRoutes = require('./routes/produtos');
+const vendasRoutes = require('./routes/vendas');
 const { configuracaoVapid } = require('./services/lembretes');
 
 const app = express();
@@ -45,6 +49,8 @@ app.use('/api/servicos', servicosRoutes);
 app.use('/api/bloqueios', bloqueiosRoutes);
 app.use('/api/agendamentos', agendamentosRoutes);
 app.use('/api/profissional', profissionalRoutes);
+app.use('/api/produtos', produtosRoutes);
+app.use('/api/vendas', vendasRoutes);
 
 // Chave pública VAPID para o front assinar notificações (sem segredo)
 app.get('/api/push/vapid-public-key', (req, res) => {
