@@ -1,9 +1,9 @@
 const express = require('express');
 const Appointment = require('../models/Appointment');
 const Profissional = require('../models/Profissional');
+const Venda = require('../models/Venda');
 const { autenticar, asyncHandler } = require('../middlewares/auth');
 const { dataValida, formatarDataAPI } = require('../services/validacoes');
-const { obterConfiguracao } = require('../services/agenda');
 
 const router = express.Router();
 
@@ -59,15 +59,21 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
     .populate('servicoId', 'nome preco duracaoMinutos')
     .sort({ data: 1, horarioInicio: 1 });
 
+  const vendas = await Venda.find({
+    profissionalId: req.auth.profissionalId,
+    data: { $gte: inicio, $lt: fim },
+    status: { $ne: 'cancelada' }
+  }).sort({ data: 1, createdAt: 1 });
+
   const porServico = {};
-  let totalPrevisto = 0;
-  let totalConfirmado = 0;
+  let totalPrevistoServicos = 0;
+  let totalConfirmadoServicos = 0;
   let totalSinalRecebido = 0;
   let totalSinalPendente = 0;
-  let qtd = 0;
+  let qtdServicos = 0;
   let qtdConfirmado = 0;
 
-  const lista = agendamentos.map(a => {
+  const listaAgendamentos = agendamentos.map(a => {
     const pag = a.pagamento || {};
     const valor = Number(
       pag.valorFinal != null
@@ -77,10 +83,10 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
     const status = a.status;
     const confirmado = status === 'confirmado' || status === 'concluido';
 
-    totalPrevisto += valor;
-    qtd += 1;
+    totalPrevistoServicos += valor;
+    qtdServicos += 1;
     if (confirmado) {
-      totalConfirmado += valor;
+      totalConfirmadoServicos += valor;
       qtdConfirmado += 1;
     }
 
@@ -116,20 +122,58 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
     };
   });
 
+  const porProduto = {};
+  let totalVendas = 0;
+  let qtdVendas = 0;
+
+  const listaVendas = vendas.map(v => {
+    totalVendas += Number(v.total || 0);
+    qtdVendas += 1;
+    for (const item of v.itens || []) {
+      const nome = item.nome || 'Produto';
+      if (!porProduto[nome]) {
+        porProduto[nome] = { produto: nome, quantidade: 0, total: 0 };
+      }
+      porProduto[nome].quantidade += Number(item.quantidade || 0);
+      porProduto[nome].total += Number(item.subtotal || 0);
+    }
+    return {
+      _id: v._id,
+      data: formatarDataAPI(v.data),
+      nomeCliente: v.nomeCliente || '',
+      itens: v.itens,
+      total: v.total,
+      observacoes: v.observacoes || ''
+    };
+  });
+
+  const arred = (n) => Math.round(Number(n || 0) * 100) / 100;
+
   res.json({
     profissional: { id: profissional._id, nome: profissional.nome },
     mes,
     resumo: {
-      quantidade: qtd,
+      quantidadeServicos: qtdServicos,
       quantidadeConfirmada: qtdConfirmado,
-      totalPrevisto: Math.round(totalPrevisto * 100) / 100,
-      totalConfirmado: Math.round(totalConfirmado * 100) / 100,
-      totalSinalRecebido: Math.round(totalSinalRecebido * 100) / 100,
-      totalSinalPendente: Math.round(totalSinalPendente * 100) / 100,
-      ticketMedio: qtd ? Math.round((totalPrevisto / qtd) * 100) / 100 : 0
+      totalPrevistoServicos: arred(totalPrevistoServicos),
+      totalConfirmadoServicos: arred(totalConfirmadoServicos),
+      totalSinalRecebido: arred(totalSinalRecebido),
+      totalSinalPendente: arred(totalSinalPendente),
+      quantidadeVendas: qtdVendas,
+      totalVendas: arred(totalVendas),
+      totalGeral: arred(totalPrevistoServicos + totalVendas),
+      totalGeralConfirmado: arred(totalConfirmadoServicos + totalVendas),
+      ticketMedioServicos: qtdServicos ? arred(totalPrevistoServicos / qtdServicos) : 0,
+      // compatibilidade com a tela anterior
+      quantidade: qtdServicos,
+      totalPrevisto: arred(totalPrevistoServicos),
+      totalConfirmado: arred(totalConfirmadoServicos),
+      ticketMedio: qtdServicos ? arred(totalPrevistoServicos / qtdServicos) : 0
     },
     porServico: Object.values(porServico).sort((a, b) => b.total - a.total),
-    agendamentos: lista
+    porProduto: Object.values(porProduto).sort((a, b) => b.total - a.total),
+    agendamentos: listaAgendamentos,
+    vendas: listaVendas
   });
 }));
 
