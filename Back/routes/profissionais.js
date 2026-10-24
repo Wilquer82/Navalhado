@@ -2,7 +2,7 @@ const express = require('express');
 const Profissional = require('../models/Profissional');
 const Servico = require('../models/Servico');
 const { autenticar, autenticarOpcional, asyncHandler } = require('../middlewares/auth');
-const { validarNome, validarPreco, validarDuracao, normalizarTelefone } = require('../services/validacoes');
+const { validarNome, validarPreco, validarDuracao, normalizarTelefone, sanitizarObjectId } = require('../services/validacoes');
 const { servicoDoProfissional, horariosDisponiveis, obterConfiguracao } = require('../services/agenda');
 
 const router = express.Router();
@@ -23,13 +23,16 @@ const serializarProfissional = (p, incluirPix = false) => ({
   ativo: p.ativo
 });
 
+// Listagem pública/logada: sem chave PIX
 router.get('/', autenticarOpcional, asyncHandler(async (req, res) => {
-  const profissionais = await Profissional.find({ ativo: true }).select('-usuario.senhaHash').sort({ nome: 1 });
-  res.json(profissionais.map(p => serializarProfissional(p, true)));
+  const profissionais = await Profissional.find({ ativo: true }).select('-usuario.senhaHash -chavePix').sort({ nome: 1 });
+  res.json(profissionais.map(p => serializarProfissional(p, false)));
 }));
 
 router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) => {
-  const profissional = await Profissional.findOne({ _id: req.params.id, ativo: true }).populate('servicos.servicoId');
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const profissional = await Profissional.findOne({ _id: id, ativo: true }).populate('servicos.servicoId');
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
   const servicos = profissional.servicos
     .filter(item => item.servicoId?.ativo)
@@ -43,9 +46,12 @@ router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) =>
 }));
 
 router.get('/:id/horarios-disponiveis', autenticarOpcional, asyncHandler(async (req, res) => {
-  const { data, servicoId } = req.query;
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
+  const servicoId = sanitizarObjectId(req.query.servicoId);
   if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) return respostaErro(res, 400, 'Data inválida.');
-  const profissional = await Profissional.findOne({ _id: req.params.id, ativo: true });
+  const profissional = await Profissional.findOne({ _id: id, ativo: true });
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
   const config = await obterConfiguracao();
   const livres = await horariosDisponiveis(profissional, data, servicoId, config);
@@ -53,7 +59,7 @@ router.get('/:id/horarios-disponiveis', autenticarOpcional, asyncHandler(async (
 }));
 
 router.post('/', autenticar, asyncHandler(async (req, res) => {
-  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body;
+  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body || {};
   if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
   const profissional = new Profissional({
     nome: String(nome).trim(),
@@ -61,20 +67,27 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
     descricao: String(descricao || especialidade || 'Geral'),
     telefone: String(telefone || ''),
     chavePix: String(chavePix || '').trim(),
-    servicos: Array.isArray(servicos) ? servicos.map(s => ({
-      servicoId: s.servicoId,
-      preco: Number(s.preco),
-      duracaoMinutos: Number(s.duracaoMinutos)
-    })) : []
+    servicos: Array.isArray(servicos)
+      ? servicos
+        .map(s => ({
+          servicoId: sanitizarObjectId(s.servicoId),
+          preco: Number(s.preco),
+          duracaoMinutos: Number(s.duracaoMinutos)
+        }))
+        .filter(s => s.servicoId)
+      : []
   });
   await profissional.save();
+  // Resposta autenticada pode incluir PIX só para o próprio cadastro recém-criado
   res.status(201).json(serializarProfissional(profissional, true));
 }));
 
 router.put('/:id', autenticar, asyncHandler(async (req, res) => {
-  const profissional = await Profissional.findById(req.params.id);
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const profissional = await Profissional.findById(id);
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
-  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body;
+  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body || {};
   if (nome !== undefined) {
     if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
     profissional.nome = String(nome).trim();
@@ -86,18 +99,22 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
   if (telefone !== undefined) profissional.telefone = String(telefone);
   if (chavePix !== undefined) profissional.chavePix = String(chavePix).trim();
   if (Array.isArray(servicos)) {
-    profissional.servicos = servicos.map(s => ({
-      servicoId: s.servicoId,
-      preco: Number(s.preco),
-      duracaoMinutos: Number(s.duracaoMinutos)
-    }));
+    profissional.servicos = servicos
+      .map(s => ({
+        servicoId: sanitizarObjectId(s.servicoId),
+        preco: Number(s.preco),
+        duracaoMinutos: Number(s.duracaoMinutos)
+      }))
+      .filter(s => s.servicoId);
   }
   await profissional.save();
   res.json(serializarProfissional(profissional, true));
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
-  const profissional = await Profissional.findByIdAndUpdate(req.params.id, { ativo: false }, { new: true });
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const profissional = await Profissional.findByIdAndUpdate(id, { ativo: false }, { new: true });
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
   res.json({ mensagem: 'Profissional desativado.' });
 }));
