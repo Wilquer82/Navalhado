@@ -23,6 +23,14 @@ const autenticarOpcional = (req, res, next) => {
   next();
 };
 
+const exigirAdmin = (req, res, next) => {
+  if (!req.auth) return respostaErro(res, 401, 'Login obrigatório.');
+  if (req.auth.role !== 'admin') {
+    return respostaErro(res, 403, 'Apenas administradores podem fazer isso.');
+  }
+  next();
+};
+
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-module.exports = { autenticar, autenticarOpcional, asyncHandler };
+module.exports = { autenticar, autenticarOpcional, exigirAdmin, asyncHandler, JWT_SECRET };
