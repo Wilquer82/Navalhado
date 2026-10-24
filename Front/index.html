@@ -5,6 +5,10 @@
     <link rel="icon" type="image/webp" href="/Logo.webp" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#000000" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <!-- React renderiza texto escapado; sem dangerouslySetInnerHTML no app. CSP reforça isso. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://navalhadoback.onrender.com https://*.onrender.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" />
     <title>Navalhado Cortes — Agendamento Online</title>
     <link rel="manifest" href="/manifest.json" />
   </head>
