@@ -2,7 +2,7 @@ const express = require('express');
 const Produto = require('../models/Produto');
 const Venda = require('../models/Venda');
 const { autenticar, asyncHandler } = require('../middlewares/auth');
-const { dataValida, dataBanco, formatarDataAPI } = require('../services/validacoes');
+const { dataValida, dataBanco, formatarDataAPI, sanitizarObjectId } = require('../services/validacoes');
 
 const router = express.Router();
 const respostaErro = (res, status, mensagem) => res.status(status).json({ erro: mensagem });
@@ -20,7 +20,8 @@ const serializarVenda = (v) => ({
 });
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {
-  const { mes, data } = req.query;
+  const mes = typeof req.query.mes === 'string' ? req.query.mes.trim() : '';
+  const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
   const query = {
     profissionalId: req.auth.profissionalId,
     status: { $ne: 'cancelada' }
@@ -58,8 +59,8 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
   let total = 0;
 
   for (const item of itensEntrada) {
-    const produtoId = item.produtoId;
-    const quantidade = Math.floor(Number(item.quantidade) || 0);
+    const produtoId = sanitizarObjectId(item?.produtoId);
+    const quantidade = Math.floor(Number(item?.quantidade) || 0);
     if (!produtoId || quantidade < 1) {
       return respostaErro(res, 400, 'Item de venda inválido.');
     }
@@ -103,8 +104,10 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
   const venda = await Venda.findOne({
-    _id: req.params.id,
+    _id: id,
     profissionalId: req.auth.profissionalId,
     status: { $ne: 'cancelada' }
   });
