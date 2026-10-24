@@ -2,11 +2,20 @@ const express = require('express');
 const Appointment = require('../models/Appointment');
 const Profissional = require('../models/Profissional');
 const { autenticar, autenticarOpcional, asyncHandler } = require('../middlewares/auth');
-const { dataValida, horarioValido, normalizarTelefone, validarNome, dataBanco, minutos, horario } = require('../services/validacoes');
-const { 
-  servicoDoProfissional, 
-  validarAgendamento, 
-  linksNotificacao, 
+const {
+  dataValida,
+  horarioValido,
+  normalizarTelefone,
+  validarNome,
+  dataBanco,
+  minutos,
+  horario,
+  sanitizarObjectId
+} = require('../services/validacoes');
+const {
+  servicoDoProfissional,
+  validarAgendamento,
+  linksNotificacao,
   serializarAgendamento
 } = require('../services/agenda');
 
@@ -32,8 +41,8 @@ function assinaturaPushValida(assinatura) {
 
 router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const body = req.body || {};
-  const profissionalId = body.profissionalId;
-  const servicoId = body.servicoId;
+  const profissionalId = sanitizarObjectId(body.profissionalId);
+  const servicoId = sanitizarObjectId(body.servicoId);
   const data = String(body.data || '').trim();
   const horarioInicio = String(body.horarioInicio || body.horario || '').trim();
   const cliente = body.cliente || {};
@@ -107,8 +116,12 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
 }));
 
 router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res) => {
+  const token = String(req.params.token || '').trim();
+  if (!token || token.length < 16 || token.length > 128) {
+    return respostaErro(res, 400, 'Token inválido.');
+  }
   const agendamento = await Appointment.findOneAndUpdate(
-    { tokenConfirmacao: req.params.token, status: 'pendente' },
+    { tokenConfirmacao: token, status: 'pendente' },
     { status: 'confirmado' },
     { new: true }
   ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
@@ -117,16 +130,18 @@ router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res
 }));
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {
-  const { data, profissionalId } = req.query;
-  const query = { status: { $ne: 'cancelado' } };
+  const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
+  const query = {
+    status: { $ne: 'cancelado' },
+    profissionalId: req.auth.profissionalId
+  };
   if (data) {
     if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
-    query.data = { 
+    query.data = {
       $gte: new Date(`${data}T00:00:00-03:00`),
       $lt: new Date(new Date(`${data}T00:00:00-03:00`).getTime() + 24 * 60 * 60 * 1000)
     };
   }
-  if (profissionalId) query.profissionalId = profissionalId;
   const agendamentos = await Appointment.find(query)
     .populate('profissionalId', 'nome')
     .populate('servicoId', 'nome preco duracaoMinutos')
@@ -135,9 +150,11 @@ router.get('/', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id/sinal-pix', autenticar, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
   const agendamento = await Appointment.findOneAndUpdate(
     {
-      _id: req.params.id,
+      _id: id,
       profissionalId: req.auth.profissionalId,
       status: { $ne: 'cancelado' },
       'pagamento.tipo': 'sinal_pix',
@@ -151,9 +168,11 @@ router.put('/:id/sinal-pix', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id/sinal-pendente', autenticar, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
   const agendamento = await Appointment.findOneAndUpdate(
     {
-      _id: req.params.id,
+      _id: id,
       profissionalId: req.auth.profissionalId,
       status: { $ne: 'cancelado' },
       'pagamento.tipo': 'sinal_pix',
@@ -167,17 +186,25 @@ router.delete('/:id/sinal-pendente', autenticar, asyncHandler(async (req, res) =
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
-  const agendamento = await Appointment.findByIdAndDelete(req.params.id);
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const agendamento = await Appointment.findOneAndDelete({
+    _id: id,
+    profissionalId: req.auth.profissionalId
+  });
   if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');
   res.json({ mensagem: 'Agendamento excluído.', agendamento: serializarAgendamento(agendamento) });
 }));
 
 router.put('/:id/status', autenticar, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
   const permitidos = ['pendente', 'confirmado', 'concluido', 'cancelado'];
-  if (!permitidos.includes(req.body.status)) return respostaErro(res, 400, 'Status inválido.');
+  const status = typeof req.body.status === 'string' ? req.body.status : '';
+  if (!permitidos.includes(status)) return respostaErro(res, 400, 'Status inválido.');
   const agendamento = await Appointment.findOneAndUpdate(
-    { _id: req.params.id, profissionalId: req.auth.profissionalId },
-    { status: req.body.status },
+    { _id: id, profissionalId: req.auth.profissionalId },
+    { status },
     { new: true }
   ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
   if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');
