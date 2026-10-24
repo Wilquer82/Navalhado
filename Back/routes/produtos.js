@@ -1,7 +1,7 @@
 const express = require('express');
 const Produto = require('../models/Produto');
 const { autenticar, asyncHandler } = require('../middlewares/auth');
-const { validarNome, validarPreco } = require('../services/validacoes');
+const { validarNome, validarPreco, sanitizarObjectId } = require('../services/validacoes');
 
 const router = express.Router();
 const respostaErro = (res, status, mensagem) => res.status(status).json({ erro: mensagem });
@@ -17,7 +17,8 @@ const serializar = (p) => ({
 });
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {
-  const soAtivos = req.query.ativos === '1' || req.query.ativos === 'true';
+  const ativosParam = typeof req.query.ativos === 'string' ? req.query.ativos : '';
+  const soAtivos = ativosParam === '1' || ativosParam === 'true';
   const filtro = soAtivos ? { ativo: true } : {};
   const produtos = await Produto.find(filtro).sort({ nome: 1 });
   res.json(produtos.map(serializar));
@@ -40,7 +41,9 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', autenticar, asyncHandler(async (req, res) => {
-  const produto = await Produto.findById(req.params.id);
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const produto = await Produto.findById(id);
   if (!produto) return respostaErro(res, 404, 'Produto não encontrado.');
   const { nome, descricao, preco, estoque, controlarEstoque, ativo } = req.body || {};
   if (nome !== undefined) {
@@ -60,7 +63,9 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
-  const produto = await Produto.findByIdAndUpdate(req.params.id, { ativo: false }, { new: true });
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const produto = await Produto.findByIdAndUpdate(id, { ativo: false }, { new: true });
   if (!produto) return respostaErro(res, 404, 'Produto não encontrado.');
   res.json({ mensagem: 'Produto desativado.', produto: serializar(produto) });
 }));
