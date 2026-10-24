@@ -1,15 +1,17 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const Profissional = require('../models/Profissional');
-const Servico = require('../models/Servico');
-const { autenticar, autenticarOpcional, asyncHandler } = require('../middlewares/auth');
-const { validarNome, validarPreco, validarDuracao, normalizarTelefone, sanitizarObjectId } = require('../services/validacoes');
-const { servicoDoProfissional, horariosDisponiveis, obterConfiguracao } = require('../services/agenda');
+const { autenticar, autenticarOpcional, exigirAdmin, asyncHandler } = require('../middlewares/auth');
+const { validarNome, sanitizarObjectId } = require('../services/validacoes');
+const { horariosDisponiveis, obterConfiguracao } = require('../services/agenda');
 
 const router = express.Router();
 
 const respostaErro = (res, status, mensagem) => res.status(status).json({ erro: mensagem });
 
-const serializarProfissional = (p, incluirPix = false) => ({
+const emailValido = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+
+const serializarProfissional = (p, { incluirPix = false, incluirAcesso = false } = {}) => ({
   _id: p._id,
   nome: p.nome,
   foto: p.foto,
@@ -20,13 +22,21 @@ const serializarProfissional = (p, incluirPix = false) => ({
   servicos: p.servicos,
   horarioTrabalho: Object.fromEntries(p.horarioTrabalho || {}),
   folgas: p.folgas,
-  ativo: p.ativo
+  ativo: p.ativo,
+  ...(incluirAcesso
+    ? {
+        temAcesso: Boolean(p.usuario?.email && p.usuario?.senhaHash),
+        emailAcesso: p.usuario?.email || ''
+      }
+    : {})
 });
 
-// Listagem pública/logada: sem chave PIX
 router.get('/', autenticarOpcional, asyncHandler(async (req, res) => {
-  const profissionais = await Profissional.find({ ativo: true }).select('-usuario.senhaHash -chavePix').sort({ nome: 1 });
-  res.json(profissionais.map(p => serializarProfissional(p, false)));
+  const isAdmin = req.auth?.role === 'admin';
+  const profissionais = await Profissional.find({ ativo: true })
+    .select(isAdmin ? '-usuario.senhaHash -chavePix' : '-usuario -chavePix')
+    .sort({ nome: 1 });
+  res.json(profissionais.map(p => serializarProfissional(p, { incluirAcesso: isAdmin })));
 }));
 
 router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) => {
@@ -78,8 +88,10 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
       : []
   });
   await profissional.save();
-  // Resposta autenticada pode incluir PIX só para o próprio cadastro recém-criado
-  res.status(201).json(serializarProfissional(profissional, true));
+  res.status(201).json(serializarProfissional(profissional, {
+    incluirPix: true,
+    incluirAcesso: req.auth?.role === 'admin'
+  }));
 }));
 
 router.put('/:id', autenticar, asyncHandler(async (req, res) => {
@@ -108,7 +120,61 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
       .filter(s => s.servicoId);
   }
   await profissional.save();
-  res.json(serializarProfissional(profissional, true));
+  res.json(serializarProfissional(profissional, {
+    incluirPix: true,
+    incluirAcesso: req.auth?.role === 'admin'
+  }));
+}));
+
+/** Admin define e-mail e senha de login do profissional */
+router.put('/:id/acesso', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const senha = String(req.body.senha || '');
+
+  if (!emailValido(email)) return respostaErro(res, 400, 'E-mail inválido.');
+  if (senha.length < 4) return respostaErro(res, 400, 'Senha deve ter pelo menos 4 caracteres.');
+
+  const outro = await Profissional.findOne({
+    'usuario.email': email,
+    _id: { $ne: id }
+  });
+  if (outro) return respostaErro(res, 409, 'Este e-mail já está em uso por outro profissional.');
+
+  const profissional = await Profissional.findById(id);
+  if (!profissional || !profissional.ativo) {
+    return respostaErro(res, 404, 'Profissional não encontrado.');
+  }
+
+  profissional.usuario = profissional.usuario || {};
+  profissional.usuario.email = email;
+  profissional.usuario.senhaHash = await bcrypt.hash(senha, 10);
+  await profissional.save();
+
+  res.json({
+    mensagem: 'Acesso do profissional cadastrado.',
+    profissional: serializarProfissional(profissional, { incluirAcesso: true })
+  });
+}));
+
+/** Admin remove o login do profissional */
+router.delete('/:id/acesso', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+
+  const profissional = await Profissional.findById(id);
+  if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
+
+  profissional.usuario = { email: undefined, senhaHash: undefined };
+  profissional.markModified('usuario');
+  await profissional.save();
+
+  res.json({
+    mensagem: 'Acesso removido.',
+    profissional: serializarProfissional(profissional, { incluirAcesso: true })
+  });
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
