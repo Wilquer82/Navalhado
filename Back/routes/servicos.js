@@ -1,7 +1,7 @@
 const express = require('express');
 const Servico = require('../models/Servico');
 const { autenticar, asyncHandler } = require('../middlewares/auth');
-const { validarNome, validarPreco, validarDuracao } = require('../services/validacoes');
+const { validarNome, validarPreco, validarDuracao, sanitizarObjectId } = require('../services/validacoes');
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ router.get('/', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.post('/', autenticar, asyncHandler(async (req, res) => {
-  const { nome, preco, duracaoMinutos, duracao, ativo } = req.body;
+  const { nome, preco, duracaoMinutos, duracao, ativo } = req.body || {};
   if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
   if (!validarPreco(preco)) return respostaErro(res, 400, 'Preço inválido.');
   const duracaoFinal = Number(duracaoMinutos ?? duracao);
@@ -38,9 +38,11 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.put('/:id', autenticar, asyncHandler(async (req, res) => {
-  const servico = await Servico.findById(req.params.id);
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const servico = await Servico.findById(id);
   if (!servico) return respostaErro(res, 404, 'Serviço não encontrado.');
-  const { nome, preco, duracaoMinutos, duracao, ativo } = req.body;
+  const { nome, preco, duracaoMinutos, duracao, ativo } = req.body || {};
   if (nome !== undefined) {
     if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
     servico.nome = String(nome).trim();
@@ -60,7 +62,9 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
-  const servico = await Servico.findByIdAndUpdate(req.params.id, { ativo: false }, { new: true });
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const servico = await Servico.findByIdAndUpdate(id, { ativo: false }, { new: true });
   if (!servico) return respostaErro(res, 404, 'Serviço não encontrado.');
   res.json({ mensagem: 'Serviço desativado.' });
 }));
