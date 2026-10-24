@@ -29,11 +29,16 @@ export default function Login() {
 
       if (!dado.token) throw new Error('Resposta de login inválida.');
       localStorage.setItem('token', dado.token);
+      localStorage.setItem('role', dado.role || 'profissional');
       if (dado.profissional?.nome) {
         localStorage.setItem('profissionalNome', dado.profissional.nome);
+      } else {
+        localStorage.removeItem('profissionalNome');
       }
       if (dado.profissional?.id) {
         localStorage.setItem('profissionalId', dado.profissional.id);
+      } else {
+        localStorage.removeItem('profissionalId');
       }
       nav('/painel', { replace: true });
     } catch (e) {
@@ -47,9 +52,9 @@ export default function Login() {
     <>
       <div className="header">
         <div className="logo-container">
-          <img 
-            src="/Logo.webp" 
-            alt="Logo Navalhado Cortes" 
+          <img
+            src="/Logo.webp"
+            alt="Logo Navalhado Cortes"
             className="logo-img"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
@@ -60,7 +65,7 @@ export default function Login() {
 
       <div style={{ padding: '20px' }}>
         {erro && <p style={{ color: '#c62828', textAlign: 'center', marginBottom: 16 }}>{erro}</p>}
-        
+
         <form onSubmit={entrar}>
           <div className="form-group" style={{ margin: '0 0 16px 0' }}>
             <label>E-mail</label>
@@ -78,7 +83,6 @@ export default function Login() {
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13 }}>
           <a href="/" style={{ color: '#666' }}>← Voltar ao agendamento</a>
         </p>
-      
       </div>
     </>
   );
