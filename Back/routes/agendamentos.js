@@ -131,10 +131,11 @@ router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {
   const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
-  const query = {
-    status: { $ne: 'cancelado' },
-    profissionalId: req.auth.profissionalId
-  };
+  const query = { status: { $ne: 'cancelado' } };
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    query.profissionalId = req.auth.profissionalId;
+  }
   if (data) {
     if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
     query.data = {
@@ -188,10 +189,9 @@ router.delete('/:id/sinal-pendente', autenticar, asyncHandler(async (req, res) =
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
-  const agendamento = await Appointment.findOneAndDelete({
-    _id: id,
-    profissionalId: req.auth.profissionalId
-  });
+  const filtro = { _id: id };
+  if (req.auth.role !== 'admin') filtro.profissionalId = req.auth.profissionalId;
+  const agendamento = await Appointment.findOneAndDelete(filtro);
   if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');
   res.json({ mensagem: 'Agendamento excluído.', agendamento: serializarAgendamento(agendamento) });
 }));
@@ -202,8 +202,10 @@ router.put('/:id/status', autenticar, asyncHandler(async (req, res) => {
   const permitidos = ['pendente', 'confirmado', 'concluido', 'cancelado'];
   const status = typeof req.body.status === 'string' ? req.body.status : '';
   if (!permitidos.includes(status)) return respostaErro(res, 400, 'Status inválido.');
+  const filtro = { _id: id };
+  if (req.auth.role !== 'admin') filtro.profissionalId = req.auth.profissionalId;
   const agendamento = await Appointment.findOneAndUpdate(
-    { _id: id, profissionalId: req.auth.profissionalId },
+    filtro,
     { status },
     { new: true }
   ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
