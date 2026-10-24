@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+
 const TIME_ZONE = 'America/Sao_Paulo';
 const diasSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
 
@@ -43,6 +45,23 @@ const formatarDataAPI = (date) => {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }).format(d);
 };
 
+/** Aceita apenas string hexadecimal de 24 chars (ObjectId). Rejeita objetos ($ne, etc.). */
+const objectIdValido = (valor) => {
+  if (typeof valor !== 'string' && typeof valor !== 'number') return false;
+  const id = String(valor).trim();
+  return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
+};
+
+/** Retorna o id como string segura ou null. */
+const sanitizarObjectId = (valor) => (objectIdValido(valor) ? String(valor).trim() : null);
+
+/** Garante que o valor é primitivo escalar (nunca objeto de operadores Mongo). */
+const escalarSeguro = (valor) => {
+  if (valor === null || valor === undefined) return null;
+  if (typeof valor === 'object') return null;
+  return valor;
+};
+
 module.exports = {
   TIME_ZONE,
   diasSemana,
@@ -59,5 +78,8 @@ module.exports = {
   validarNome,
   validarPreco,
   validarDuracao,
-  formatarDataAPI
+  formatarDataAPI,
+  objectIdValido,
+  sanitizarObjectId,
+  escalarSeguro
 };
