@@ -30,7 +30,7 @@ const PORT = process.env.PORT || 5000;
 // ✅ CORREÇÃO: CORS configurado de forma definitiva
 const origensPermitidas = (
   process.env.CORS_ORIGINS ||
-  'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com, https://navalhado-86ac.onrender.com/'
+  'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com'
 )
   .split(',')
   .map((item) => item.trim())
