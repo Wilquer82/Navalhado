@@ -27,34 +27,54 @@ const { configuracaoVapid } = require('./services/lembretes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
-app.use(express.json());
+// ✅ CORREÇÃO: CORS configurado de forma definitiva
+const origensPermitidas = (
+  process.env.CORS_ORIGINS ||
+  'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com'
+)
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
+
+console.log('✅ Origens permitidas pelo CORS:', origensPermitidas);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      const permitidas = (
-        process.env.CORS_ORIGINS ||
-        'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com,https://navalhado-86ac.onrender.com/'
-      )
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-      if (!origin || permitidas.includes(origin) || permitidas.includes('*')) {
+      // Permite requisições sem origem (ex: Postman, testes diretos)
+      if (!origin) {
         return callback(null, true);
       }
-      const aceitaRender = permitidas.some(
-        (item) =>
-          item.endsWith('.onrender.com') &&
-          origin.endsWith(item.replace('*', ''))
-      );
-      if (aceitaRender) return callback(null, true);
-      return callback(new Error('Origem nao permitida pelo CORS'));
+
+      // Verificação exata e também por começo/termo para evitar problemas com barras
+      const permitida = origensPermitidas.some((orig) => {
+        // Combina correspondência exata + se origem começa com o valor permitido
+        return (
+          origin === orig ||
+          origin.startsWith(orig) ||
+          orig.replace(/\/$/, '') === origin.replace(/\/$/, '')
+        );
+      });
+
+      if (permitida) {
+        console.log('✅ Origem aceita:', origin);
+        return callback(null, true);
+      }
+
+      console.log('❌ Origem BLOQUEADA:', origin);
+      return callback(null, false); // Retorna sem erro de lançamento, apenas bloqueia
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    optionsSuccessStatus: 200,
   })
 );
 
-// Rotas — TODAS antes do 404
+// Middlewares — DEPOIS do CORS
+app.use(express.json());
+
+// Rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/profissionais', profissionaisRoutes);
 app.use('/api/servicos', servicosRoutes);
@@ -64,7 +84,7 @@ app.use('/api/profissional', profissionalRoutes);
 app.use('/api/produtos', produtosRoutes);
 app.use('/api/vendas', vendasRoutes);
 
-// Chave pública VAPID para o front assinar notificações (sem segredo)
+// Chave pública VAPID
 app.get('/api/push/vapid-public-key', (req, res) => {
   const config = configuracaoVapid();
   if (!config?.publicKey) {
@@ -83,15 +103,17 @@ app.get('/api/dados', async (req, res) => {
   });
 });
 
-// Tratamento 404 — SEMPRE por último
+// Tratamento 404
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada.' });
 });
 
 // Tratamento de erros
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ erro: 'Erro interno do servidor.' });
+  console.error('⚠️ Erro na aplicação:', err);
+  res
+    .status(err.status || 500)
+    .json({ erro: err.message || 'Erro interno do servidor.' });
 });
 
 module.exports = { app, PORT };
