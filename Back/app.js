@@ -34,7 +34,7 @@ app.use(
     origin: (origin, callback) => {
       const permitidas = (
         process.env.CORS_ORIGINS ||
-        'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com'
+        'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com,https://navalhado-86ac.onrender.com/,,https://navalhado-86ac.onrender.com/api'
       )
         .split(',')
         .map((item) => item.trim())
