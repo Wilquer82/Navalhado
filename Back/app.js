@@ -27,22 +27,22 @@ const { configuracaoVapid } = require('./services/lembretes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ LISTA COMPLETA — com TODOS os domínios
+// ✅ TODAS as origens corretas na lista
 const origensPermitidas = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://navalhado-86ac.onrender.com', // ✅ Seu frontend que está chamando
-  'https://navalhado.onrender.com', // Outro domínio do frontend
-  'https://navalhadoback.onrender.com', // Outro backend
+  'https://navalhado-86ac.onrender.com',
+  'https://navalhado.onrender.com',
+  'https://navalhadoback.onrender.com',
 ];
 
 console.log('✅ Origens permitidas:', origensPermitidas);
 
-// ✅ CORS configurado corretamente
+// ✅ CORS corrigido — sem erro de variável
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Permite requisições sem origem (Postman, testes diretos)
+      // Permite sem origem (Postman, testes diretos)
       if (!origin) {
         console.log('ℹ️ Sem origem — permitido');
         return callback(null, true);
@@ -55,12 +55,11 @@ app.use(
       );
 
       if (permitida) {
-        console.log('✅ ACEITA:', origem);
+        console.log('✅ ACEITA:', origin);
         return callback(null, true);
       }
 
-      console.log('❌ BLOQUEADA:', origem, '(limpa:', origemLimpa, ')');
-      // ⚠️ Não lance erro — apenas bloqueie silenciosamente
+      console.log('❌ BLOQUEADA:', origin);
       return callback(null, false);
     },
     credentials: true,
