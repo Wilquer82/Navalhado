@@ -1,65 +1,19 @@
 ﻿{
-    "summary":  "Analise das 7 leis de UX/UI (Fitts, Hick, Zeigarnik, Jakob, Gradiente de Meta, von Restorff, Miller) aplicadas ao projeto Navalhado Cortes - backend CORS corrigido, frontend usa https://navalhadoback-v81k.onrender.com",
+    "summary":  "Recovery: CORS structure fix - callback null/false was breaking Access-Control-Allow-Origin header. Reverted to working structure with credentials: true inside cors() options.",
     "preferences":  [
-                        {
-                            "evidence":  "Verificado em Agendar, Painel e componentes",
-                            "title":  "Cores de destaque",
-                            "body":  "Usar cores consistentes: #2d2d2d (escuro), #1565c0 (azul), #2e7d32 (verde), #c62828 (vermelho/erro)",
-                            "scope":  "project"
-                        },
-                        {
-                            "evidence":  "Agendar tem 4 steps; considerer reduzir se houver necessidade",
-                            "title":  "Fluxo de multi-step",
-                            "body":  "Manter 3-4 steps máximos para evitar sobrecarga cognitiva (Lei de Hick e Miller)",
-                            "scope":  "project"
-                        }
+
                     ],
-    "task_id":  "navalhado-ux-ui-laws-2026-10-31",
+    "task_id":  "navalhado-ux-ui-laws-2026-10-31-recovery",
     "learnings":  [
                       {
-                          "evidence":  "Log de erro: \u0027Origem nao permitida pelo CORS\u0027 aparecia no Render; After-fix: requests funcionam",
-                          "title":  "CORS credentials: true placement",
-                          "body":  "O credentials: true deve estar DENTRO do objeto cors(), não fora. Era uma linha duplicada após o fechamento do cors(). Corrigido movendo para dentro com vírgula antes."
-                      },
-                      {
-                          "evidence":  "Análise do Agendar.jsx: botões como \u0027Confirmar agendamento\u0027, \u0027Copiar PIX\u0027 têm padding e estilos adequados",
-                          "title":  "Lei de Fitts",
-                          "body":  "Botões e links devem ter tamanho adequado e distância mínima. No Navalhado: botões de agendar, copiar PIX e navs devem ser grandes o suficiente para clique preciso em mobile."
-                      },
-                      {
-                          "evidence":  "Agendar usa steps (1-4) para profissional → serviço → data/horário → dados. Painel tem abas organizadas.",
-                          "title":  "Lei de Hick",
-                          "body":  "Número de opções deve ser limitado. Telas de multi-step no Agendar (4 steps) evitam sobrecarga. Menus de admin devem ter opções agrupadas ou pagination."
-                      },
-                      {
-                          "evidence":  "Stepper no Agendar mostra conclusão parcial; usuário volta ao não finalizar. Notificações push solicitadas como lembrete 15min antes.",
-                          "title":  "Lei de Zeigarnik",
-                          "body":  "Tarefas não finalizadas criam tensão que motiva conclusão. No Navalhado: efeito de progresso nos steps, lembretes de agendamento, e salvamento automático evitam perda."
-                      },
-                      {
-                          "evidence":  "Fluxo Agendar segue padrão conhecido: profissional → serviço → data → confirmação. Botões consistentes (btn, btn-outline).",
-                          "title":  "Lei de Jakob",
-                          "body":  "Usuários esperam que seu site funcione como outros que conhecem (Google, Amazon, etc). Navalhado segue padrões: stepper, formulários, modais, confirmações."
-                      },
-                      {
-                          "evidence":  "Stepper no Agendar mostra status (done/active). Cálculo Pix mostra original, sinal, desconto, total, restante.",
-                          "title":  "Gradiente de Meta",
-                          "body":  "Progresso visível motiva conclusão. No Navalhado: stepper visual (1-4 com dots), progresso de preenchimento de dados, cálculo de PIX com totais e descontos."
-                      },
-                      {
-                          "evidence":  "Estilos consistentes: botões ativos (#2d2d2d fg on #fff), errors em vermelho, sucesso em verde, info em azul. CTA destacado.",
-                          "title":  "Lei von Restorff",
-                          "body":  "Elementos distintamente diferentes são melhor lembrados. No Navalhado: cores de destaque (#2d2d2d para ativos, #1565c0 para azul, #2e7d32 para verde, #c62828 para vermelho/erro)."
-                      },
-                      {
-                          "evidence":  "Stepper tem exatamente 4 steps. Listas no painel têm filtros e paginação implícita. Selects de profissional têm option limitadas.",
-                          "title":  "Lei de Miller",
-                          "body":  "Limite de 7±2 itens (UX moderna: 4±1). No Navalhado: listas profissionais, serviços, horários têm limite controlado. Steps do agendamento têm no máximo 4 steps."
+                          "evidence":  "Error log: \u0027No Access-Control-Allow-Origin header is present\u0027 - caused by incorrect callback return value",
+                          "title":  "CORS callback pattern",
+                          "body":  "callback(null, false) nao envia Access-Control-Allow-Origin header. Must use callback(new Error(\u0027message\u0027)) for blocked origins, or callback(null, true, { \u0027Access-Control-Allow-Origin\u0027: origin }) for allowed origins."
                       }
                   ],
     "verification":  [
-                         "CORS corrigido: credentials: true movido para dentro do objeto cors() em Back/app.js",
-                         "Frontend atualizado para usar API https://navalhadoback-v81k.onrender.com",
-                         "Lista de origens CORS atualizada para incluir https://navalhado-86ac.onrender.com"
+                         "CORS structure: credentials: true inside cors() options (not outside)",
+                         "Origin callback: returns Error for blocked origins, not callback(null, false)",
+                         "Additional CORS headers: methods, allowedHeaders, optionsSuccessStatus added"
                      ]
 }

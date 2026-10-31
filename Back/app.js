@@ -62,7 +62,7 @@ app.use(
       }
 
       console.log('❌ Origem BLOQUEADA:', origin);
-      return callback(null, false); // Retorna sem erro de lançamento, apenas bloqueia
+      return callback(new Error("Origem não permitida pelo CORS"));ia
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -117,3 +117,6 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = { app, PORT };
+
+
+
