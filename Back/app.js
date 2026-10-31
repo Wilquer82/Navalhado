@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -29,18 +29,30 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 app.use(express.json());
-app.use(cors({
-  origin: (origin, callback) => {
-    const permitidas = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com,https://navalhado-1.onrender.com,https://navalhadoback.onrender.com')
-      .split(',').map(item => item.trim()).filter(Boolean);
-    if (!origin || permitidas.includes(origin) || permitidas.includes('*')) {
-      return callback(null, true);
-    }
-    const aceitaRender = permitidas.some(item => item.endsWith('.onrender.com') && origin.endsWith(item.replace('*', '')));
-    if (aceitaRender) return callback(null, true);
-    return callback(new Error('Origem não permitida pelo CORS'));
-  }
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const permitidas = (
+        process.env.CORS_ORIGINS ||
+        'http://localhost:5173,http://localhost:3000,https://navalhado-86ac.onrender.com'
+      )
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (!origin || permitidas.includes(origin) || permitidas.includes('*')) {
+        return callback(null, true);
+      }
+      const aceitaRender = permitidas.some(
+        (item) =>
+          item.endsWith('.onrender.com') &&
+          origin.endsWith(item.replace('*', ''))
+      );
+      if (aceitaRender) return callback(null, true);
+      return callback(new Error('Origem nao permitida pelo CORS'));
+    },
+    credentials: true,
+  })
+);
 
 // Rotas — TODAS antes do 404
 app.use('/api/auth', authRoutes);
@@ -64,7 +76,11 @@ app.get('/api/push/vapid-public-key', (req, res) => {
 // Rota pública de dados
 app.get('/api/dados', async (req, res) => {
   const Profissional = mongoose.model('Profissional');
-  res.json({ profissionais: await Profissional.find({ ativo: true }).select('-usuario.senhaHash -chavePix') });
+  res.json({
+    profissionais: await Profissional.find({ ativo: true }).select(
+      '-usuario.senhaHash -chavePix'
+    ),
+  });
 });
 
 // Tratamento 404 — SEMPRE por último
