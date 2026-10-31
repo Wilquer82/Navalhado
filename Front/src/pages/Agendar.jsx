@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { baixarEventoICalendar, criarEventoCalendario } from '../utils/calendario';
 
-const API = import.meta.env.VITE_API || 'https://navalhadoback.onrender.com/api';
+const API = import.meta.env.VITE_API || 'https://navalhadoback-v81k.onrender.com/api';
 
 const dataLocalISO = data => {
   const ano = data.getFullYear();

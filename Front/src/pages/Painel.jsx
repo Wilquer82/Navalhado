@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AbaProdutos, AbaVendas } from './ProdutosVendas';
 
-const API = import.meta.env.VITE_API || 'https://navalhadoback.onrender.com/api';
+const API = import.meta.env.VITE_API || 'https://navalhadoback-v81k.onrender.com/api';
 const dataLocalISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
 export default function Painel() {
