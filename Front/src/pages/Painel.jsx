@@ -157,7 +157,7 @@ export default function Painel() {
         <button style={estiloAba(aba === 'bloqueios')} onClick={() => setAba('bloqueios')}>Bloqueios</button>
       </div>
 
-      {msg && <div style={{ padding: 12, margin: 12, background: '#e8f5e9', color: '#2e7d32', borderRadius: 8, textAlign: 'center' }}>{msg}</div>}
+      {msg && <div style={{ padding: 12, margin: 12, background: '#d1e7dd', color: '#1b5e20', borderRadius: 8, textAlign: 'center' }}>{msg}</div>}
 
       {aba === 'agendamentos' && (
         <div style={{ padding: 12 }}>
@@ -165,6 +165,7 @@ export default function Painel() {
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ddd', marginBottom: 12 }} />
           {agendamentos.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#999', padding: 40 }}>Nenhum agendamento.</p>
+           <button style={{marginTop: 12, background: "#2d3748", color: "#fff", padding: "8px 16px", border: "none", borderRadius: 4, cursor: "pointer"]} onClick={() => setAba("agendamentos")>Criar agendamento</button>
           ) : agendamentos.map(a => (
             <div key={a._id} className="appointment-item">
               <div className="top">
@@ -289,11 +290,11 @@ export default function Painel() {
               />
               <input
                 type="password"
-                placeholder="Senha (mÃ­n. 4 caracteres)"
+                placeholder="Senha (mín. 8 caracteres)"
                 value={formAcesso.senha}
                 onChange={e => setFormAcesso({ ...formAcesso, senha: e.target.value })}
                 required
-                minLength={4}
+                minLength={8}
                 style={{ width: '100%', padding: 12, marginBottom: 8, borderRadius: 8, border: '1px solid #ddd' }}
               />
               <button type="submit" style={{ width: '100%', padding: 12, background: '#1565c0', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600 }}>
@@ -374,3 +375,6 @@ export default function Painel() {
     </main>
   );
 }
+
+
+
