@@ -63,6 +63,9 @@ export default function Painel() {
   const [mostrarFormManual, setMostrarFormManual] = useState(false);
   const [carregandoAgendamentos, setCarregandoAgendamentos] = useState(false);
   const [salvandoManual, setSalvandoManual] = useState(false);
+  const [servicosManuais, setServicosManuais] = useState([]);
+  const [carregandoServicosManuais, setCarregandoServicosManuais] = useState(false);
+  const [erroServicosManuais, setErroServicosManuais] = useState('');
   const [horariosDisponiveis, setHorariosDisponiveis] = useState([]);
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [erroHorarios, setErroHorarios] = useState('');
@@ -176,6 +179,39 @@ export default function Painel() {
   }, [aba]);
 
   useEffect(() => {
+    if (!mostrarFormManual || !formManual.profissionalId) {
+      setServicosManuais([]);
+      setCarregandoServicosManuais(false);
+      setErroServicosManuais('');
+      return;
+    }
+
+    const controller = new AbortController();
+    setServicosManuais([]);
+    setCarregandoServicosManuais(true);
+    setErroServicosManuais('');
+
+    (async () => {
+      try {
+        const dados = await apiFetch(
+          `${API}/profissionais/${encodeURIComponent(formManual.profissionalId)}/servicos`,
+          { signal: controller.signal }
+        );
+        if (!Array.isArray(dados)) throw new Error('Resposta inválida ao carregar serviços do profissional.');
+        setServicosManuais(dados);
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          setErroServicosManuais(e.message || 'Não foi possível carregar os serviços do profissional.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setCarregandoServicosManuais(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [aba, mostrarFormManual, formManual.profissionalId]);
+
+  useEffect(() => {
     if (!mostrarFormManual || !formManual.profissionalId || !formManual.servicoId || !formManual.data) {
       setHorariosDisponiveis([]);
       setCarregandoHorarios(false);
@@ -214,17 +250,6 @@ export default function Painel() {
   }, [aba, mostrarFormManual, formManual.profissionalId, formManual.servicoId, formManual.data]);
 
   const formatarMoeda = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const servicosDoProfissional = profissionalId => {
-    const profissional = profissionais.find(p => p._id === profissionalId);
-    return (profissional?.servicos || [])
-      .map(vinculo => {
-        const servicoId = typeof vinculo.servicoId === 'object' ? vinculo.servicoId?._id : vinculo.servicoId;
-        const servico = servicos.find(item => item._id === servicoId && item.ativo !== false);
-        return servico ? { ...servico, preco: vinculo.preco ?? servico.preco } : null;
-      })
-      .filter(Boolean);
-  };
-  const servicosManuais = servicosDoProfissional(formManual.profissionalId);
   const agendamentosAtivosDoDia = agendamentos.filter(a => a.status !== 'cancelado').length;
   const termoBusca = buscaCliente.trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const telefoneBusca = buscaCliente.replace(/\D/g, '');
@@ -482,8 +507,7 @@ export default function Painel() {
                   <span>Profissional</span>
                   <select value={formManual.profissionalId} onChange={e => {
                     const profissionalId = e.target.value;
-                    const servicos = servicosDoProfissional(profissionalId);
-                    setFormManual(form => ({ ...form, profissionalId, servicoId: servicos[0]?._id || '' }));
+                    setFormManual(form => ({ ...form, profissionalId, servicoId: '', horario: '' }));
                   }} required>
                     <option value="">Selecione</option>
                     {profissionais.map(p => <option key={p._id} value={p._id}>{p.nome}</option>)}
@@ -491,8 +515,23 @@ export default function Painel() {
                 </label>
                 <label>
                   <span>Serviço</span>
-                  <select value={formManual.servicoId} onChange={e => setFormManual(form => ({ ...form, servicoId: e.target.value, horario: '' }))} required disabled={!servicosManuais.length}>
-                    <option value="">Selecione</option>
+                  <select
+                    value={formManual.servicoId}
+                    onChange={e => setFormManual(form => ({ ...form, servicoId: e.target.value, horario: '' }))}
+                    required
+                    disabled={carregandoServicosManuais || !servicosManuais.length || !formManual.profissionalId}
+                  >
+                    <option value="">
+                      {carregandoServicosManuais
+                        ? 'Carregando serviços...'
+                        : erroServicosManuais
+                          ? 'Falha ao carregar serviços'
+                          : !formManual.profissionalId
+                            ? 'Selecione um profissional'
+                            : servicosManuais.length
+                              ? 'Selecione um serviço'
+                              : 'Nenhum serviço disponível'}
+                    </option>
                     {servicosManuais.map(s => <option key={s._id} value={s._id}>{s.nome} · {formatarMoeda(s.preco)}</option>)}
                   </select>
                 </label>
@@ -534,13 +573,17 @@ export default function Painel() {
                   />
                 </label>
               </div>
+              {erroServicosManuais && <div className="appointments-error" role="alert">{erroServicosManuais}</div>}
+              {!carregandoServicosManuais && !erroServicosManuais && formManual.profissionalId && !servicosManuais.length && (
+                <p className="manual-no-slots">Este profissional não possui serviços disponíveis.</p>
+              )}
               {erroHorarios && <div className="appointments-error" role="alert">{erroHorarios}</div>}
               {!carregandoHorarios && !erroHorarios && formManual.profissionalId && formManual.servicoId && formManual.data && !horariosDisponiveis.length && (
                 <p className="manual-no-slots">Não há horários disponíveis para esta combinação.</p>
               )}
               <div className="manual-form-actions">
                 <button type="button" className="appointment-secondary-button" onClick={() => setMostrarFormManual(false)}>Voltar</button>
-                <button type="submit" className="appointment-primary-button" disabled={salvandoManual || carregandoHorarios || !servicosManuais.length || !horariosDisponiveis.some(item => (typeof item === 'string' ? item : item.horarioInicio) === formManual.horario)}>
+                <button type="submit" className="appointment-primary-button" disabled={salvandoManual || carregandoServicosManuais || Boolean(erroServicosManuais) || carregandoHorarios || !servicosManuais.some(s => s._id === formManual.servicoId) || !horariosDisponiveis.some(item => (typeof item === 'string' ? item : item.horarioInicio) === formManual.horario)}>
                   {salvandoManual ? 'Salvando...' : 'Criar agendamento'}
                 </button>
               </div>
