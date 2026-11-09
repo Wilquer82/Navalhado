@@ -3,25 +3,32 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 
-// Models
-require('./models/Appointment');
-require('./models/Profissional');
-require('./models/Servico');
-require('./models/ConfiguracaoGeral');
-require('./models/User');
-require('./models/Bloqueio');
-require('./models/Produto');
-require('./models/Venda');
+const models = [
+  './models/Appointment',
+  './models/Profissional',
+  './models/Servico',
+  './models/ConfiguracaoGeral',
+  './models/User',
+  './models/Bloqueio',
+  './models/Produto',
+  './models/Venda',
+  './models/ClienteFidelidade',
+  './models/ListaEspera'
+];
 
-// Rotas
+models.forEach(m => require(m));
+
 const authRoutes = require('./routes/auth');
 const profissionaisRoutes = require('./routes/profissionais');
 const servicosRoutes = require('./routes/servicos');
 const bloqueiosRoutes = require('./routes/bloqueios');
 const agendamentosRoutes = require('./routes/agendamentos');
 const profissionalRoutes = require('./routes/profissional');
+const profissionalAdminRoutes = require('./routes/profissional-admin');
 const produtosRoutes = require('./routes/produtos');
 const vendasRoutes = require('./routes/vendas');
+const fidelidadeRoutes = require('./routes/fidelidade');
+const listaEsperaRoutes = require('./routes/lista-espera');
 const { configuracaoVapid } = require('./services/lembretes');
 
 const app = express();
@@ -81,6 +88,8 @@ app.use('/api/agendamentos', agendamentosRoutes);
 app.use('/api/profissional', profissionalRoutes);
 app.use('/api/produtos', produtosRoutes);
 app.use('/api/vendas', vendasRoutes);
+app.use('/api/fidelidade', fidelidadeRoutes);
+app.use('/api/lista-espera', listaEsperaRoutes);
 
 // Chave pública VAPID
 app.get('/api/push/vapid-public-key', (req, res) => {

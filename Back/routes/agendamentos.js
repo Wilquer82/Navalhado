@@ -315,14 +315,66 @@ router.put('/:id/status', autenticar, asyncHandler(async (req, res) => {
   if (req.auth.role !== 'admin') {
     if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
     filtro.profissionalId = req.auth.profissionalId;
+    filtro.status = { $ne: 'cancelado' };
   }
-  const agendamento = await Appointment.findOneAndUpdate(
-    filtro,
-    { status },
-    { new: true }
-  ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
+  const agendamento = await Appointment.findOne(filtro);
   if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');
-  res.json(serializarAgendamento(agendamento, agendamento.profissionalId, agendamento.servicoId));
+  const statusAnterior = agendamento.status;
+  agendamento.status = status;
+  const shouldAwardCommission = status === 'finalizado' && statusAnterior !== 'finalizado' && !agendamento.comissaoValor;
+  if (shouldAwardCommission) {
+    const Profissional = require('../models/Profissional');
+    const profissional = await Profissional.findById(agendamento.profissionalId);
+    const percentual = profissional?.comissaoPercentual ?? 50;
+    const valorFinal = agendamento.pagamento?.valorFinal ?? 0;
+    agendamento.comissaoValor = parseFloat((valorFinal * percentual / 100).toFixed(2));
+    agendamento.comissaoPercentual = percentual;
+  }
+  const isFinalized = status === 'finalizado' || status === 'concluido';
+  const shouldAwardLoyalty = isFinalized && agendamento.telefoneNormalizado && !agendamento.fidelidadeJaPontuada && statusAnterior !== 'finalizado' && statusAnterior !== 'concluido';
+  if (shouldAwardLoyalty) {
+    agendamento.fidelidadeJaPontuada = true;
+  }
+  await agendamento.save();
+  const profissionalDoc = await agendamento.populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
+  const resultado = serializarAgendamento(profissionalDoc, profissionalDoc.profissionalId, profissionalDoc.servicoId);
+  if (profissionalDoc.comissaoValor !== undefined) {
+    resultado.comissaoValor = profissionalDoc.comissaoValor;
+    resultado.comissaoPercentual = profissionalDoc.comissaoPercentual;
+  }
+  if (shouldAwardLoyalty && agendamento.telefoneNormalizado) {
+    const ClienteFidelidade = require('../models/ClienteFidelidade');
+    let cliente = await ClienteFidelidade.findOne({ telefoneNormalizado: agendamento.telefoneNormalizado });
+    if (!cliente) cliente = new ClienteFidelidade({ telefoneNormalizado: agendamento.telefoneNormalizado });
+    cliente.pontos += 1;
+    cliente.ajustes.push({ tipo: 'adicionar', pontos: 1, motivo: 'Agendamento finalizado', criadoPor: null });
+    await cliente.save();
+    resultado.fidelidadePontos = cliente.pontos;
+  }
+  res.json(resultado);
+}));
+
+router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
+  const profissores = req.auth.role === 'admin' ? await require('../models/Profissional').find({ ativo: true }).select('_id nome') : [{ _id: req.auth.profissionalId }];
+  const resultados = [];
+  for (const prof of profissores) {
+    const agendamentos = await Appointment.find({
+      profissionalId: prof._id,
+      status: { $in: ['finalizado', 'concluido'] }
+    });
+    const totalServicos = agendamentos.reduce((s, a) => s + (a.pagamento?.valorFinal || 0), 0);
+    const totalComissao = agendamentos.reduce((s, a) => s + (a.comissaoValor || 0), 0);
+    const totalSalao = totalServicos - totalComissao;
+    resultados.push({
+      profissionalId: prof._id,
+      profissionalNome: prof.nome,
+      totalServicos,
+      totalComissao,
+      totalSalao
+    });
+  }
+  const totalGeral = resultados.reduce((s, r) => ({ totalServicos: s.totalServicos + r.totalServicos, totalComissao: s.totalComissao + r.totalComissao, totalSalao: s.totalSalao + r.totalSalao }), { totalServicos: 0, totalComissao: 0, totalSalao: 0 });
+  res.json({ porProfissional: resultados, total: totalGeral });
 }));
 
 module.exports = router;

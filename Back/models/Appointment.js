@@ -12,7 +12,7 @@ const appointmentSchema = new mongoose.Schema({
   lembreteTentativas: { type: Number, default: 0 },
   lembreteEnviadoEm: { type: Date },
   whatsappConfirmacaoEnviadaEm: { type: Date },
-  whatsappLembreteEnviadoEm: { type: Date },
+  whatsappLembreteEnviadaEm: { type: Date },
   pushSubscription: { type: mongoose.Schema.Types.Mixed },
   nomeCliente: { type: String, required: true },
   telefoneCliente: { type: String, required: true },
@@ -33,6 +33,9 @@ const appointmentSchema = new mongoose.Schema({
     enum: ['agendado', 'confirmado', 'em_atendimento', 'finalizado', 'cancelado', 'nao_compareceu', 'pendente', 'concluido'],
     default: 'agendado'
   },
+  comissaoValor: { type: Number, min: 0, default: undefined },
+  comissaoPercentual: { type: Number, min: 0, max: 100, default: undefined },
+  fidelidadeJaPontuada: { type: Boolean, default: false },
   criadoEm: { type: Date, default: Date.now },
   tokenConfirmacao: { type: String, unique: true, sparse: true }
 }, { timestamps: true });
@@ -42,5 +45,17 @@ appointmentSchema.index(
   { unique: true, partialFilterExpression: { status: { $ne: 'cancelado' } } }
 );
 appointmentSchema.index({ telefoneNormalizado: 1, status: 1, data: -1 });
+
+appointmentSchema.pre('save', async function(next) {
+  if (this.isModified('status') && this.status === 'finalizado' && !this.comissaoValor) {
+    const Profissional = mongoose.model('Profissional');
+    const profissional = await Profissional.findById(this.profissionalId);
+    const percentual = profissional?.comissaoPercentual ?? 50;
+    const valorFinal = this.pagamento?.valorFinal ?? 0;
+    this.comissaoValor = parseFloat((valorFinal * percentual / 100).toFixed(2));
+    this.comissaoPercentual = percentual;
+  }
+  next();
+});
 
 module.exports = mongoose.model('Appointment', appointmentSchema);

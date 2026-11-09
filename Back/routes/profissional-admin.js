@@ -48,16 +48,14 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
   const fim = new Date(inicio);
   fim.setMonth(fim.getMonth() + 1);
 
-  const profissional = await Profissional.findById(req.auth.profissionalId).select('nome');
+  const profissional = await Profissional.findById(req.auth.profissionalId).select('nome comissaoPercentual');
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
 
-  const agendamentos = await Appointment.find({
+  const agendamentosFinalizados = await Appointment.find({
     profissionalId: req.auth.profissionalId,
     data: { $gte: inicio, $lt: fim },
-    status: { $ne: 'cancelado' }
-  })
-    .populate('servicoId', 'nome preco duracaoMinutos')
-    .sort({ data: 1, horarioInicio: 1 });
+    status: { $in: ['finalizado', 'concluido'] }
+  }).sort({ data: 1, horarioInicio: 1 });
 
   const vendas = await Venda.find({
     profissionalId: req.auth.profissionalId,
@@ -65,115 +63,37 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
     status: { $ne: 'cancelada' }
   }).sort({ data: 1, createdAt: 1 });
 
-  const porServico = {};
-  let totalPrevistoServicos = 0;
-  let totalConfirmadoServicos = 0;
-  let totalSinalRecebido = 0;
-  let totalSinalPendente = 0;
-  let qtdServicos = 0;
-  let qtdConfirmado = 0;
+  let totalServicos = 0;
+  let totalComissao = 0;
 
-  const listaAgendamentos = agendamentos.map(a => {
-    const pag = a.pagamento || {};
-    const valor = Number(
-      pag.valorFinal != null
-        ? pag.valorFinal
-        : (a.servicoId?.preco ?? 0)
-    );
-    const status = a.status;
-    const confirmado = status === 'confirmado' || status === 'concluido';
+  for (const a of agendamentosFinalizados) {
+    const valor = a.pagamento?.valorFinal || 0;
+    totalServicos += valor;
+    totalComissao += a.comissaoValor || (valor * (profissional.comissaoPercentual || 50) / 100);
+  }
 
-    totalPrevistoServicos += valor;
-    qtdServicos += 1;
-    if (confirmado) {
-      totalConfirmadoServicos += valor;
-      qtdConfirmado += 1;
-    }
-
-    if (pag.tipo === 'sinal_pix') {
-      const sinal = Number(pag.valorSinal || 0);
-      if (pag.statusSinal === 'recebido') totalSinalRecebido += sinal;
-      else totalSinalPendente += sinal;
-    }
-
-    const nomeServico = a.servicoId?.nome || 'Serviço';
-    if (!porServico[nomeServico]) {
-      porServico[nomeServico] = { servico: nomeServico, quantidade: 0, total: 0 };
-    }
-    porServico[nomeServico].quantidade += 1;
-    porServico[nomeServico].total += valor;
-
-    return {
-      _id: a._id,
-      data: formatarDataAPI(a.data),
-      horario: a.horarioInicio,
-      nomeCliente: a.nomeCliente,
-      telefone: a.telefoneCliente,
-      servico: nomeServico,
-      status,
-      valor,
-      pagamento: {
-        tipo: pag.tipo || 'integral',
-        valorFinal: valor,
-        valorSinal: Number(pag.valorSinal || 0),
-        statusSinal: pag.statusSinal || null,
-        valorRestante: Number(pag.valorRestante || 0)
-      }
-    };
-  });
-
-  const porProduto = {};
   let totalVendas = 0;
-  let qtdVendas = 0;
+  let quantidadeServicos = 0;
 
-  const listaVendas = vendas.map(v => {
+  for (const v of vendas) {
     totalVendas += Number(v.total || 0);
-    qtdVendas += 1;
-    for (const item of v.itens || []) {
-      const nome = item.nome || 'Produto';
-      if (!porProduto[nome]) {
-        porProduto[nome] = { produto: nome, quantidade: 0, total: 0 };
-      }
-      porProduto[nome].quantidade += Number(item.quantidade || 0);
-      porProduto[nome].total += Number(item.subtotal || 0);
-    }
-    return {
-      _id: v._id,
-      data: formatarDataAPI(v.data),
-      nomeCliente: v.nomeCliente || '',
-      itens: v.itens,
-      total: v.total,
-      observacoes: v.observacoes || ''
-    };
-  });
+  }
+  quantidadeServicos = agendamentosFinalizados.length;
 
   const arred = (n) => Math.round(Number(n || 0) * 100) / 100;
 
   res.json({
-    profissional: { id: profissional._id, nome: profissional.nome },
+    profissional: { id: profissional._id, nome: profissional.nome, comissaoPercentual: profissional.comissaoPercentual || 50 },
     mes,
     resumo: {
-      quantidadeServicos: qtdServicos,
-      quantidadeConfirmada: qtdConfirmado,
-      totalPrevistoServicos: arred(totalPrevistoServicos),
-      totalConfirmadoServicos: arred(totalConfirmadoServicos),
-      totalSinalRecebido: arred(totalSinalRecebido),
-      totalSinalPendente: arred(totalSinalPendente),
-      quantidadeVendas: qtdVendas,
+      quantidadeServicos: quantidadeServicos,
+      totalServicos: arred(totalServicos),
+      totalComissao: arred(totalComissao),
+      totalSalao: arred(totalServicos - totalComissao),
       totalVendas: arred(totalVendas),
-      totalGeral: arred(totalPrevistoServicos + totalVendas),
-      totalGeralConfirmado: arred(totalConfirmadoServicos + totalVendas),
-      ticketMedioServicos: qtdServicos ? arred(totalPrevistoServicos / qtdServicos) : 0,
-      // compatibilidade com a tela anterior
-      quantidade: qtdServicos,
-      totalPrevisto: arred(totalPrevistoServicos),
-      totalConfirmado: arred(totalConfirmadoServicos),
-      ticketMedio: qtdServicos ? arred(totalPrevistoServicos / qtdServicos) : 0
-    },
-    porServico: Object.values(porServico).sort((a, b) => b.total - a.total),
-    porProduto: Object.values(porProduto).sort((a, b) => b.total - a.total),
-    agendamentos: listaAgendamentos,
-    vendas: listaVendas
+      totalGeral: arred(totalServicos + totalVendas),
+      ticketMedioServicos: quantidadeServicos ? arred(totalServicos / quantidadeServicos) : 0
+    }
   });
 }));
 

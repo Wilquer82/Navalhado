@@ -8,6 +8,7 @@ const profissionalSchema = new mongoose.Schema({
   bio: { type: String, trim: true, maxlength: 120, default: '' },
   telefone: { type: String, default: '' },
   chavePix: { type: String, default: '' },
+  comissaoPercentual: { type: Number, default: 50, min: 0, max: 100 },
   servicos: [{
     servicoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Servico', required: true },
     preco: { type: Number, required: true, min: 0 },

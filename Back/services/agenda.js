@@ -176,7 +176,9 @@ function serializarAgendamento(agendamento, profissional, servico) {
   delete dadosPublicos.lembreteTentativas;
   delete dadosPublicos.lembreteEnviadoEm;
   delete dadosPublicos.telefoneNormalizado;
-  return {
+  delete dadosPublicos.tokenConfirmacao;
+  delete dadosPublicos.fidelidadeJaPontuada;
+  const resultado = {
     ...dadosPublicos,
     data: formatarDataAPI(dadosPublicos.data),
     horario: dadosPublicos.horarioInicio,
@@ -186,6 +188,11 @@ function serializarAgendamento(agendamento, profissional, servico) {
     servico: servico ? { _id: servico._id, nome: servico.nome, preco: servico.preco, duracaoMinutos: servico.duracaoMinutos, duracao: servico.duracaoMinutos } : dadosPublicos.servicoId,
     observacoes: dadosPublicos.observacoes || ''
   };
+  if (dadosPublicos.comissaoValor !== undefined) {
+    resultado.comissaoValor = dadosPublicos.comissaoValor;
+    resultado.comissaoPercentual = dadosPublicos.comissaoPercentual;
+  }
+  return resultado;
 }
 
 module.exports = {
