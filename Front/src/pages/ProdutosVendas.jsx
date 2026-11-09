@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import CampoData from '../components/CampoData';
 
 const inputStyle = {
   width: '100%', padding: 12, marginBottom: 8,
@@ -111,10 +112,9 @@ export function AbaProdutos({ apiFetch, API, formatarMoeda, msg, setMsg }) {
   );
 }
 
-export function AbaVendas({ apiFetch, API, formatarMoeda, msg, setMsg, dataLocalISO }) {
+export function AbaVendas({ apiFetch, API, formatarMoeda, msg, setMsg, dataVenda, setDataVenda }) {
   const [produtos, setProdutos] = useState([]);
   const [vendas, setVendas] = useState([]);
-  const [dataVenda, setDataVenda] = useState(dataLocalISO(new Date()));
   const [formVenda, setFormVenda] = useState({ nomeCliente: '', observacoes: '', itens: [] });
   const [produtoVendaId, setProdutoVendaId] = useState('');
   const [qtdVenda, setQtdVenda] = useState('1');
@@ -197,7 +197,7 @@ export function AbaVendas({ apiFetch, API, formatarMoeda, msg, setMsg, dataLocal
       <form onSubmit={registrar} style={{ background: '#fafafa', padding: '16px', borderRadius: '12px', marginBottom: '20px' }}>
         <h3 style={{ fontSize: 15, marginBottom: 12 }}>Registrar venda</h3>
         <label style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Data da venda</label>
-        <input type="date" value={dataVenda} onChange={e => setDataVenda(e.target.value)} style={inputStyle} />
+        <CampoData value={dataVenda} onChange={setDataVenda} style={inputStyle} />
         <input placeholder="Cliente (opcional)" value={formVenda.nomeCliente} onChange={e => setFormVenda({ ...formVenda, nomeCliente: e.target.value })} style={inputStyle} />
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <select value={produtoVendaId} onChange={e => setProdutoVendaId(e.target.value)} style={{ ...inputStyle, marginBottom: 0, flex: 2 }}>

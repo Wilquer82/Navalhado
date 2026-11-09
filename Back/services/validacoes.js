@@ -40,6 +40,21 @@ const validarPreco = (preco) => Number(preco) >= 0;
 
 const validarDuracao = (duracao) => Number(duracao) >= 1;
 
+const validarBioProfissional = (bio) => typeof bio === 'string' && bio.trim().length <= 120;
+
+const validarFotoUrl = (foto) => {
+  if (typeof foto !== 'string') return false;
+  const valor = foto.trim();
+  if (!valor) return true;
+  if (valor.length > 2048) return false;
+  try {
+    const url = new URL(valor);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+};
+
 const formatarDataAPI = (date) => {
   const d = date instanceof Date ? date : new Date(date);
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }).format(d);
@@ -78,6 +93,8 @@ module.exports = {
   validarNome,
   validarPreco,
   validarDuracao,
+  validarBioProfissional,
+  validarFotoUrl,
   formatarDataAPI,
   objectIdValido,
   sanitizarObjectId,

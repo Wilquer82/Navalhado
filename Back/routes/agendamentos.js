@@ -48,6 +48,11 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const cliente = body.cliente || {};
   const nomeCliente = String(body.nomeCliente || cliente.nome || '').trim();
   const telefoneCliente = String(body.telefoneCliente || cliente.telefone || body.telefone || '').trim();
+  if (body.observacoes !== undefined && typeof body.observacoes !== 'string') {
+    return respostaErro(res, 400, 'Observações devem ser um texto.');
+  }
+  const observacoes = (body.observacoes || '').trim();
+  if (observacoes.length > 500) return respostaErro(res, 400, 'Observações devem ter no máximo 500 caracteres.');
   const pushSubscription = body.pushSubscription;
   const usarSinalPix = body.usarSinalPix === true;
   const aceiteSinal = body.aceiteSinal === true;
@@ -97,8 +102,9 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
     pushSubscription,
     nomeCliente,
     telefoneCliente,
+    observacoes,
     pagamento,
-    status: 'pendente',
+    status: 'agendado',
     tokenConfirmacao: require('crypto').randomBytes(24).toString('hex')
   });
   try {
@@ -107,11 +113,14 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
     if (error.code === 11000) return respostaErro(res, 409, 'Horário já reservado.');
     throw error;
   }
-  const links = await linksNotificacao(agendamento, profissional, vinculo.servico);
+  const { whatsappCliente, whatsappProfissional, linkConfirmacao } =
+    await linksNotificacao(agendamento, profissional, vinculo.servico);
   res.status(201).json({
     ...serializarAgendamento(agendamento, profissional, vinculo.servico),
     ...(usarSinalPix ? { chavePix: profissional.chavePix } : {}),
-    ...links
+    whatsappCliente,
+    whatsappProfissional,
+    linkConfirmacao
   });
 }));
 
@@ -121,7 +130,7 @@ router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res
     return respostaErro(res, 400, 'Token inválido.');
   }
   const agendamento = await Appointment.findOneAndUpdate(
-    { tokenConfirmacao: token, status: 'pendente' },
+    { tokenConfirmacao: token, status: { $in: ['pendente', 'agendado'] } },
     { status: 'confirmado' },
     { new: true }
   ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
@@ -131,10 +140,11 @@ router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {
   const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
-  const query = { status: { $ne: 'cancelado' } };
+  const query = {};
   if (req.auth.role !== 'admin') {
     if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
     query.profissionalId = req.auth.profissionalId;
+    query.status = { $ne: 'cancelado' };
   }
   if (data) {
     if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
@@ -147,20 +157,58 @@ router.get('/', autenticar, asyncHandler(async (req, res) => {
     .populate('profissionalId', 'nome')
     .populate('servicoId', 'nome preco duracaoMinutos')
     .sort({ data: 1, horarioInicio: 1 });
-  res.json(agendamentos.map(a => serializarAgendamento(a, a.profissionalId, a.servicoId)));
+  const resultado = await Promise.all(agendamentos.map(async a => {
+    const links = await linksNotificacao(a, a.profissionalId, a.servicoId);
+    return {
+      ...serializarAgendamento(a, a.profissionalId, a.servicoId),
+      whatsappConfirmacao: links.whatsappConfirmacao,
+      whatsappLembrete: links.whatsappLembrete
+    };
+  }));
+  res.json(resultado);
+}));
+
+router.put('/:id/whatsapp-enviado', autenticar, asyncHandler(async (req, res) => {
+  const id = sanitizarObjectId(req.params.id);
+  if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const tipo = typeof req.body?.tipo === 'string' ? req.body.tipo : '';
+  const campo = tipo === 'confirmacao'
+    ? 'whatsappConfirmacaoEnviadaEm'
+    : tipo === 'lembrete'
+      ? 'whatsappLembreteEnviadoEm'
+      : null;
+  if (!campo) return respostaErro(res, 400, 'Tipo de mensagem WhatsApp inválido.');
+
+  const filtro = { _id: id };
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    filtro.profissionalId = req.auth.profissionalId;
+  }
+
+  const agendamento = await Appointment.findOneAndUpdate(
+    filtro,
+    { $set: { [campo]: new Date() } },
+    { new: true }
+  ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
+  if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');
+  res.json(serializarAgendamento(agendamento, agendamento.profissionalId, agendamento.servicoId));
 }));
 
 router.put('/:id/sinal-pix', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const filtro = {
+    _id: id,
+    status: { $ne: 'cancelado' },
+    'pagamento.tipo': 'sinal_pix',
+    'pagamento.statusSinal': { $ne: 'recebido' }
+  };
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    filtro.profissionalId = req.auth.profissionalId;
+  }
   const agendamento = await Appointment.findOneAndUpdate(
-    {
-      _id: id,
-      profissionalId: req.auth.profissionalId,
-      status: { $ne: 'cancelado' },
-      'pagamento.tipo': 'sinal_pix',
-      'pagamento.statusSinal': { $ne: 'recebido' }
-    },
+    filtro,
     { $set: { 'pagamento.statusSinal': 'recebido' } },
     { new: true }
   ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
@@ -171,14 +219,18 @@ router.put('/:id/sinal-pix', autenticar, asyncHandler(async (req, res) => {
 router.delete('/:id/sinal-pendente', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
+  const filtro = {
+    _id: id,
+    status: { $ne: 'cancelado' },
+    'pagamento.tipo': 'sinal_pix',
+    'pagamento.statusSinal': { $ne: 'recebido' }
+  };
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    filtro.profissionalId = req.auth.profissionalId;
+  }
   const agendamento = await Appointment.findOneAndUpdate(
-    {
-      _id: id,
-      profissionalId: req.auth.profissionalId,
-      status: { $ne: 'cancelado' },
-      'pagamento.tipo': 'sinal_pix',
-      'pagamento.statusSinal': { $ne: 'recebido' }
-    },
+    filtro,
     { $set: { status: 'cancelado' } },
     { new: true }
   );
@@ -190,7 +242,10 @@ router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
   const filtro = { _id: id };
-  if (req.auth.role !== 'admin') filtro.profissionalId = req.auth.profissionalId;
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    filtro.profissionalId = req.auth.profissionalId;
+  }
   const agendamento = await Appointment.findOneAndDelete(filtro);
   if (!agendamento) return respostaErro(res, 404, 'Agendamento não encontrado.');
   res.json({ mensagem: 'Agendamento excluído.', agendamento: serializarAgendamento(agendamento) });
@@ -199,11 +254,23 @@ router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
 router.put('/:id/status', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
-  const permitidos = ['pendente', 'confirmado', 'concluido', 'cancelado'];
+  const permitidos = [
+    'agendado',
+    'confirmado',
+    'em_atendimento',
+    'finalizado',
+    'cancelado',
+    'nao_compareceu',
+    'pendente',
+    'concluido'
+  ];
   const status = typeof req.body.status === 'string' ? req.body.status : '';
   if (!permitidos.includes(status)) return respostaErro(res, 400, 'Status inválido.');
   const filtro = { _id: id };
-  if (req.auth.role !== 'admin') filtro.profissionalId = req.auth.profissionalId;
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    filtro.profissionalId = req.auth.profissionalId;
+  }
   const agendamento = await Appointment.findOneAndUpdate(
     filtro,
     { status },

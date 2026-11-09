@@ -1,8 +1,50 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { baixarEventoICalendar, criarEventoCalendario } from '../utils/calendario';
 
 const API = import.meta.env.VITE_API || 'https://navalhadoback-v81k.onrender.com/api';
+
+function CartaoProfissional({ profissional, onSelecionar }) {
+  const [fotoIndisponivel, setFotoIndisponivel] = useState(!profissional.foto);
+  const bio = String(profissional.bio || '').trim().slice(0, 120);
+  const iniciais = profissional.nome?.trim()?.[0]?.toLocaleUpperCase('pt-BR') || '?';
+
+  return (
+    <div className="card" onClick={onSelecionar} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      {fotoIndisponivel ? (
+        <div
+          aria-hidden="true"
+          style={{
+            width: 64,
+            height: 64,
+            flex: '0 0 64px',
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            background: '#eee',
+            color: '#555',
+            fontSize: 24,
+            fontWeight: 600
+          }}
+        >
+          {iniciais}
+        </div>
+      ) : (
+        <img
+          src={profissional.foto}
+          alt=""
+          onError={() => setFotoIndisponivel(true)}
+          style={{ width: 64, height: 64, flex: '0 0 64px', borderRadius: '50%', objectFit: 'cover' }}
+        />
+      )}
+      <div style={{ minWidth: 0 }}>
+        <h3>{profissional.nome}</h3>
+        <p>{profissional.especialidade || profissional.descricao || 'Geral'}</p>
+        {bio && <p style={{ marginTop: 4 }}>{bio}</p>}
+      </div>
+    </div>
+  );
+}
 
 const dataLocalISO = data => {
   const ano = data.getFullYear();
@@ -15,6 +57,45 @@ const formatarMoeda = valor => Number(valor || 0).toLocaleString('pt-BR', {
   style: 'currency',
   currency: 'BRL'
 });
+
+const calcularDuracaoMinutos = (inicio, fim) => {
+  const minutosDoHorario = horario => {
+    const partes = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(horario || '');
+    return partes ? Number(partes[1]) * 60 + Number(partes[2]) : null;
+  };
+  const inicioMinutos = minutosDoHorario(inicio);
+  const fimMinutos = minutosDoHorario(fim);
+  if (inicioMinutos === null || fimMinutos === null || inicioMinutos === fimMinutos) return null;
+  return (fimMinutos - inicioMinutos + 1440) % 1440;
+};
+
+const telefoneWhatsAppProfissional = telefone => {
+  const digitos = String(telefone || '').replace(/\D/g, '');
+  const numero = digitos.length === 10 || digitos.length === 11
+    ? `55${digitos}`
+    : digitos;
+  return /^55\d{10,11}$/.test(numero) ? numero : null;
+};
+
+const criarLinkWhatsAppProfissional = dados => {
+  const numero = telefoneWhatsAppProfissional(dados.profissional?.telefone);
+  if (!numero) return null;
+
+  const data = dados.data
+    ? new Date(`${dados.data}T00:00:00`).toLocaleDateString('pt-BR')
+    : '';
+  const observacoes = String(dados.observacoes || '').trim();
+  const mensagem = [
+    `Olá, ${dados.profissional?.nome || 'gostaria de falar sobre meu agendamento'}!`,
+    'Solicitei um agendamento pelo site:',
+    `Serviço: ${dados.servico?.nome || ''}`,
+    `Data e horário: ${data} às ${dados.horario || ''}`,
+    `Nome: ${dados.nomeCliente || ''}`,
+    observacoes ? `Observação: ${observacoes}` : ''
+  ].filter(Boolean).join('\n');
+
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+};
 
 const calcularSinalPix = preco => {
   const original = Math.round(Number(preco || 0) * 100);
@@ -76,6 +157,7 @@ export default function Agendar() {
   const [sucesso, setSucesso] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [carregandoProfissionais, setCarregandoProfissionais] = useState(true);
+  const [carregandoServicos, setCarregandoServicos] = useState(false);
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [erroHorarios, setErroHorarios] = useState('');
   const [erroAgendamento, setErroAgendamento] = useState('');
@@ -83,6 +165,9 @@ export default function Agendar() {
   const [usarSinalPix, setUsarSinalPix] = useState(false);
   const [aceiteSinal, setAceiteSinal] = useState(false);
   const [mensagemPix, setMensagemPix] = useState('');
+  const servicosRequestRef = useRef(null);
+
+  useEffect(() => () => servicosRequestRef.current?.abort(), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,11 +210,12 @@ export default function Agendar() {
   const profissionalId = dados.profissional?._id;
   const servicoId = dados.servico?._id;
   const valoresPix = calcularSinalPix(dados.servico?.preco);
+  const whatsappProfissional = sucesso ? criarLinkWhatsAppProfissional(dados) : null;
   const eventoCalendario = sucesso && dados.servico
     ? criarEventoCalendario({
       data: dados.data,
       horario: dados.horario,
-      duracaoMinutos: dados.servico.duracaoMinutos,
+      duracaoMinutos: dados.duracaoMinutos ?? dados.servico.duracaoMinutos ?? dados.servico.duracao,
       profissional: dados.profissional.nome,
       servico: dados.servico.nome
     })
@@ -169,16 +255,32 @@ export default function Agendar() {
   }, [dataSel, profissionalId, servicoId]);
 
   const selecionarProfissional = p => {
+    servicosRequestRef.current?.abort();
+    const controller = new AbortController();
+    servicosRequestRef.current = controller;
     setDados({ profissional: p });
     setUsarSinalPix(false);
     setAceiteSinal(false);
     setMensagemPix('');
     setServicos([]);
+    setErroAgendamento('');
+    setCarregandoServicos(true);
     setDataSel('');
-    fetch(`${API}/profissionais/${p._id}/servicos`)
-      .then(res => res.ok ? res.json() : Promise.reject(new Error('Não foi possível carregar os serviços.')))
-      .then(setServicos)
-      .catch(e => setErroAgendamento(e.message));
+    fetch(`${API}/profissionais/${p._id}/servicos`, { signal: controller.signal })
+      .then(res => {
+        if (!res.ok) throw new Error('Não foi possível carregar os serviços.');
+        return res.json();
+      })
+      .then(lista => {
+        if (!Array.isArray(lista)) throw new Error('A lista de serviços recebida é inválida.');
+        setServicos(lista);
+      })
+      .catch(e => {
+        if (e.name !== 'AbortError') setErroAgendamento(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCarregandoServicos(false);
+      });
     setStep(2);
   };
 
@@ -222,6 +324,12 @@ export default function Agendar() {
       setCarregando(false);
       return;
     }
+    const observacoes = String(dados.observacoes || '').trim();
+    if (observacoes.length > 500) {
+      setErroAgendamento('A observação deve ter no máximo 500 caracteres.');
+      setCarregando(false);
+      return;
+    }
     try {
       let pushSubscription = null;
       let motivoLembrete = null;
@@ -248,6 +356,7 @@ export default function Agendar() {
           horarioInicio: dados.horario,
           nomeCliente: dados.nomeCliente,
           telefoneCliente: telefone,
+          observacoes,
           pushSubscription,
           usarSinalPix,
           aceiteSinal
@@ -256,9 +365,20 @@ export default function Agendar() {
 
       const resposta = await res.json();
       if (!res.ok) throw new Error(resposta.erro || 'Erro ao agendar. Tente novamente.');
+      const horarioInicio = resposta.horarioInicio || resposta.horario || dados.horario;
+      const duracaoMinutos = calcularDuracaoMinutos(horarioInicio, resposta.horarioFim)
+        ?? dados.servico.duracaoMinutos
+        ?? dados.servico.duracao;
       setDados({
         ...dados,
-        whatsappCliente: resposta.whatsappCliente,
+        profissional: { ...dados.profissional, ...(resposta.profissional || {}) },
+        servico: { ...dados.servico, ...(resposta.servico || {}) },
+        data: resposta.data || dados.data,
+        horario: horarioInicio,
+        duracaoMinutos,
+        nomeCliente: resposta.nomeCliente || dados.nomeCliente,
+        telefone: resposta.telefoneCliente || resposta.telefone || telefone,
+        observacoes: resposta.observacoes ?? observacoes,
         pagamento: resposta.pagamento,
         chavePix: resposta.chavePix,
         lembreteAtivado: Boolean(pushSubscription),
@@ -334,6 +454,17 @@ export default function Agendar() {
           })} às {dados.horario}
         </p>
         <p>Aguarde confirmação do profissional.</p>
+        <div className="summary">
+          <h4>Resumo do agendamento</h4>
+          <div className="row"><span>Profissional</span><span>{dados.profissional?.nome}</span></div>
+          <div className="row"><span>Serviço</span><span>{dados.servico?.nome}</span></div>
+          <div className="row"><span>Duração</span><span>{dados.duracaoMinutos ?? dados.servico?.duracaoMinutos ?? dados.servico?.duracao} min</span></div>
+          <div className="row"><span>Valor do serviço</span><span>{formatarMoeda(dados.pagamento?.valorOriginal ?? dados.servico?.preco)}</span></div>
+          <div className="row"><span>Data e horário</span><span>{new Date(`${dados.data}T00:00:00`).toLocaleDateString('pt-BR')} às {dados.horario}</span></div>
+          <div className="row"><span>Nome</span><span>{dados.nomeCliente}</span></div>
+          <div className="row"><span>Telefone</span><span>{dados.telefone}</span></div>
+          {dados.observacoes && <div className="row"><span>Observação</span><span>{dados.observacoes}</span></div>}
+        </div>
         {dados.pagamento && (
           <div className="summary">
             <div className="row"><span>Total do serviço</span><span>{formatarMoeda(dados.pagamento.valorOriginal)}</span></div>
@@ -378,7 +509,13 @@ export default function Agendar() {
           </div>
         )}
         <p>{textoLembreteSucesso()}</p>
-        {dados.whatsappCliente && <a className="btn" href={dados.whatsappCliente} target="_blank" rel="noreferrer">Enviar mensagem no WhatsApp</a>}
+        {whatsappProfissional ? (
+          <a className="btn" href={whatsappProfissional} target="_blank" rel="noreferrer">
+            Enviar resumo ao profissional pelo WhatsApp
+          </a>
+        ) : (
+          <p role="status">WhatsApp do profissional indisponível no momento.</p>
+        )}
         <button className="btn btn-outline" onClick={reiniciar}>Novo agendamento</button>
       </div>
     );
@@ -432,10 +569,11 @@ export default function Agendar() {
             </div>
           ) : profissionais.length > 0 ? (
             profissionais.map(p => (
-              <div key={p._id || p.id} className="card" onClick={() => selecionarProfissional(p)}>
-                <h3>{p.nome}</h3>
-                <p>{p.descricao || 'Geral'}</p>
-              </div>
+              <CartaoProfissional
+                key={p._id || p.id}
+                profissional={p}
+                onSelecionar={() => selecionarProfissional(p)}
+              />
             ))
           ) : (
             <div className="loading">Nenhum profissional disponível.</div>
@@ -446,15 +584,21 @@ export default function Agendar() {
       {step === 2 && (
         <>
           <div className="section-title">Escolha o serviço</div>
-          {servicos.map(s => (
+          {carregandoServicos ? (
+            <div className="loading" role="status">Carregando serviços...</div>
+          ) : erroAgendamento ? (
+            <div className="form-error" role="alert">{erroAgendamento}</div>
+          ) : servicos.length > 0 ? servicos.map(s => (
             <div key={s._id || s.id} className="card" onClick={() => selecionarServico(s)}>
               <h3>{s.nome}</h3>
               <div className="meta">
-                <span className="preco">R$ {s.preco}</span>
-                <span className="duracao">{s.duracaoMinutos} min</span>
+                <span className="preco">{formatarMoeda(s.preco)}</span>
+                <span className="duracao">{s.duracaoMinutos ?? s.duracao} min</span>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="loading">Nenhum serviço disponível para este profissional.</div>
+          )}
           <button className="btn btn-outline" onClick={() => setStep(1)}>
             ← Voltar
           </button>
@@ -532,10 +676,13 @@ export default function Agendar() {
             <h4>Resumo do agendamento</h4>
             <div className="row"><span>Profissional</span><span>{dados.profissional?.nome}</span></div>
             <div className="row"><span>Serviço</span><span>{dados.servico?.nome}</span></div>
-            <div className="row"><span>Duração</span><span>{dados.servico?.duracaoMinutos} min</span></div>
+            <div className="row"><span>Duração</span><span>{dados.servico?.duracaoMinutos ?? dados.servico?.duracao} min</span></div>
             <div className="row"><span>Data</span><span>{new Date(dados.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span></div>
             <div className="row"><span>Horário</span><span>{dados.horario}</span></div>
             <div className="row"><span>Valor do serviço</span><span>{formatarMoeda(valoresPix.original)}</span></div>
+            <div className="row"><span>Nome</span><span>{dados.nomeCliente || '—'}</span></div>
+            <div className="row"><span>Telefone</span><span>{dados.telefone || '—'}</span></div>
+            <div className="row"><span>Observação</span><span>{dados.observacoes?.trim() || 'Nenhuma'}</span></div>
             {usarSinalPix ? (
               <>
                 <div className="row"><span>Sinal PIX (50%)</span><span>{formatarMoeda(valoresPix.sinal)}</span></div>
@@ -612,6 +759,19 @@ export default function Agendar() {
               const mascara = valor.length > 10 ? valor.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3') : valor.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
               atualizarDados({ target: { name: 'telefone', value: mascara } });
             }} required placeholder="(11) 99999-9999" />
+          </div>
+          <div className="form-group">
+            <label htmlFor="observacoes">Observação (opcional)</label>
+            <textarea
+              id="observacoes"
+              name="observacoes"
+              value={dados.observacoes || ''}
+              onChange={atualizarDados}
+              maxLength={500}
+              rows={4}
+              placeholder="Alguma informação que o profissional deva saber?"
+            />
+            <small>{(dados.observacoes || '').length}/500</small>
           </div>
 
           <div className="form-group" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>

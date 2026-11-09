@@ -1,8 +1,14 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const Profissional = require('../models/Profissional');
+const Servico = require('../models/Servico');
 const { autenticar, autenticarOpcional, exigirAdmin, asyncHandler } = require('../middlewares/auth');
-const { validarNome, sanitizarObjectId } = require('../services/validacoes');
+const {
+  validarNome,
+  validarBioProfissional,
+  validarFotoUrl,
+  sanitizarObjectId
+} = require('../services/validacoes');
 const { horariosDisponiveis, obterConfiguracao } = require('../services/agenda');
 
 const router = express.Router();
@@ -16,7 +22,8 @@ const serializarProfissional = (p, { incluirPix = false, incluirAcesso = false }
   nome: p.nome,
   foto: p.foto,
   descricao: p.descricao,
-  especialidade: p.descricao,
+  especialidade: p.especialidade || p.descricao,
+  bio: p.bio || '',
   telefone: p.telefone,
   ...(incluirPix ? { chavePix: p.chavePix } : {}),
   servicos: p.servicos,
@@ -33,10 +40,18 @@ const serializarProfissional = (p, { incluirPix = false, incluirAcesso = false }
 
 router.get('/', autenticarOpcional, asyncHandler(async (req, res) => {
   const isAdmin = req.auth?.role === 'admin';
-  const profissionais = await Profissional.find({ ativo: true })
-    .select(isAdmin ? '-usuario.senhaHash -chavePix' : '-usuario -chavePix')
+  if (req.auth?.role === 'profissional' && !req.auth.profissionalId) {
+    return respostaErro(res, 403, 'Acesso negado.');
+  }
+  const filtro = isAdmin ? {} : { ativo: true };
+  if (req.auth?.role === 'profissional') filtro._id = req.auth.profissionalId;
+  const profissionais = await Profissional.find(filtro)
+    .select(isAdmin ? '-usuario.senhaHash' : '-usuario -chavePix')
     .sort({ nome: 1 });
-  res.json(profissionais.map(p => serializarProfissional(p, { incluirAcesso: isAdmin })));
+  res.json(profissionais.map(p => serializarProfissional(p, {
+    incluirPix: isAdmin,
+    incluirAcesso: isAdmin
+  })));
 }));
 
 router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) => {
@@ -44,7 +59,7 @@ router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) =>
   if (!id) return respostaErro(res, 400, 'ID inválido.');
   const profissional = await Profissional.findOne({ _id: id, ativo: true }).populate('servicos.servicoId');
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
-  const servicos = profissional.servicos
+  const servicosVinculados = profissional.servicos
     .filter(item => item.servicoId?.ativo)
     .map(item => ({
       ...item.servicoId.toObject(),
@@ -52,6 +67,20 @@ router.get('/:id/servicos', autenticarOpcional, asyncHandler(async (req, res) =>
       duracaoMinutos: item.duracaoMinutos,
       duracao: item.duracaoMinutos
     }));
+  const idsVinculados = await Profissional.distinct('servicos.servicoId', {
+    'servicos.servicoId': { $exists: true }
+  });
+  const servicosGlobais = await Servico.find({
+    ativo: true,
+    _id: { $nin: idsVinculados }
+  }).sort({ nome: 1 });
+  const servicos = [
+    ...servicosVinculados,
+    ...servicosGlobais.map(servico => ({
+      ...servico.toObject(),
+      duracao: servico.duracaoMinutos
+    }))
+  ].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   res.json(servicos);
 }));
 
@@ -68,13 +97,21 @@ router.get('/:id/horarios-disponiveis', autenticarOpcional, asyncHandler(async (
   res.json(livres);
 }));
 
-router.post('/', autenticar, asyncHandler(async (req, res) => {
-  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body || {};
+router.post('/', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
+  const { nome, foto, descricao, especialidade, bio, telefone, chavePix, servicos } = req.body || {};
   if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
+  if (!validarFotoUrl(foto === undefined ? '' : foto)) return respostaErro(res, 400, 'Informe uma URL de foto HTTP ou HTTPS válida.');
+  const bioFinal = bio === undefined || bio === null ? '' : typeof bio === 'string' ? bio.trim() : bio;
+  if (!validarBioProfissional(bioFinal)) return respostaErro(res, 400, 'A bio deve ter no máximo 120 caracteres.');
+  const especialidadeEntrada = especialidade || descricao || 'Geral';
+  if (typeof especialidadeEntrada !== 'string') return respostaErro(res, 400, 'Especialidade inválida.');
+  const especialidadeFinal = especialidadeEntrada.trim() || 'Geral';
   const profissional = new Profissional({
     nome: String(nome).trim(),
-    foto: String(foto || ''),
-    descricao: String(descricao || especialidade || 'Geral'),
+    foto: String(foto || '').trim(),
+    descricao: String(descricao || especialidadeFinal).trim(),
+    especialidade: especialidadeFinal,
+    bio: bioFinal.trim(),
     telefone: String(telefone || ''),
     chavePix: String(chavePix || '').trim(),
     servicos: Array.isArray(servicos)
@@ -97,16 +134,36 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
 router.put('/:id', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId || String(req.auth.profissionalId) !== id) {
+      return respostaErro(res, 403, 'Acesso negado.');
+    }
+  }
   const profissional = await Profissional.findById(id);
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
-  const { nome, foto, descricao, especialidade, telefone, chavePix, servicos } = req.body || {};
+  const { nome, foto, descricao, especialidade, bio, telefone, chavePix, servicos } = req.body || {};
+  if (req.auth.role !== 'admin' && servicos !== undefined) {
+    return respostaErro(res, 403, 'Apenas administradores podem alterar os serviços oferecidos.');
+  }
   if (nome !== undefined) {
     if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
     profissional.nome = String(nome).trim();
   }
-  if (foto !== undefined) profissional.foto = String(foto);
+  if (foto !== undefined) {
+    if (!validarFotoUrl(foto)) return respostaErro(res, 400, 'Informe uma URL de foto HTTP ou HTTPS válida.');
+    profissional.foto = String(foto).trim();
+  }
   if (descricao !== undefined || especialidade !== undefined) {
-    profissional.descricao = String(descricao || especialidade || 'Geral');
+    const especialidadeEntrada = especialidade || descricao || 'Geral';
+    if (typeof especialidadeEntrada !== 'string') return respostaErro(res, 400, 'Especialidade inválida.');
+    const valorEspecialidade = especialidadeEntrada.trim() || 'Geral';
+    profissional.descricao = valorEspecialidade;
+    profissional.especialidade = valorEspecialidade;
+  }
+  if (bio !== undefined) {
+    const bioFinal = bio === null ? '' : typeof bio === 'string' ? bio.trim() : bio;
+    if (!validarBioProfissional(bioFinal)) return respostaErro(res, 400, 'A bio deve ter no máximo 120 caracteres.');
+    profissional.bio = bioFinal.trim();
   }
   if (telefone !== undefined) profissional.telefone = String(telefone);
   if (chavePix !== undefined) profissional.chavePix = String(chavePix).trim();
@@ -177,7 +234,7 @@ router.delete('/:id/acesso', autenticar, exigirAdmin, asyncHandler(async (req, r
   });
 }));
 
-router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
+router.delete('/:id', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
   const profissional = await Profissional.findByIdAndUpdate(id, { ativo: false }, { new: true });

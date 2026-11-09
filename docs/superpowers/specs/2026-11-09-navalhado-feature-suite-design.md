@@ -4,7 +4,7 @@
 
 Entregar as 11 melhorias solicitadas sem interromper o agendamento existente, com APIs validadas no backend, telas compatíveis com o visual atual e entregas pequenas verificáveis. A agenda deve continuar usando o fuso `America/Sao_Paulo`; profissionais comuns permanecem limitados aos próprios dados e o admin mantém visão geral.
 
-Esta especificação não autoriza mudanças de código. Cada incremento terá uma proposta curta com arquivos, comportamento e validação, seguida de aprovação explícita antes da implementação.
+O usuário autorizou iniciar a implementação incremental dos 11 itens em 2026-11-09. Antes de cada bloco, apresentar brevemente os arquivos e o comportamento a alterar. Validar o bloco antes de avançar e preservar o funcionamento existente.
 
 ## Estado atual relevante
 
@@ -80,7 +80,7 @@ Esta especificação não autoriza mudanças de código. Cada incremento terá u
 
 ## Fases e responsáveis
 
-As fases são seriais por causa do working tree compartilhado:
+As fases com arquivos sobrepostos são seriais por causa do working tree compartilhado. Trabalho em arquivos exclusivos pode avançar em paralelo, com handoff obrigatório antes da integração:
 
 0. Fechar as tarefas já iniciadas: correção de acesso admin, datas, status do agendamento e UI administrativa existente. A conversa que edita `Painel.jsx` continua única responsável por esse arquivo.
 1. **Fundação de agenda e contratos:** validar associação profissional-serviço, preço/duração por profissional, disponibilidade e bloqueios; definir DTOs e testes de regras no backend.
@@ -91,15 +91,15 @@ As fases são seriais por causa do working tree compartilhado:
 6. **Autenticação:** política de senha, troca obrigatória e recuperação por e-mail; testar configuração ausente e token expirado/reutilizado.
 7. **Integração final:** build frontend, validações backend e regressões públicas/admin/profissional; revisar todos os diffs antes de integrar.
 
-Responsabilidades provisórias:
+Responsabilidades coordenadas:
 
-- Conversa de acesso admin: concluir a correção original e, depois, item 11 somente quando as fases anteriores e a proposta específica forem aprovadas.
-- Conversa de backend/status: contratos, validações e modelos/API, sem editar telas.
-- Conversa de datas/fluxo público: concluir a correção original; futuramente, somente `Agendar.jsx` e componentes próprios.
-- Conversa canônica de UI: concluir a UI existente e, futuramente, somente `Painel.jsx`, estilos e componentes administrativos.
+- Conversa de acesso admin: concluir a correção original; depois, receber eventual trabalho de autenticação quando a sequência liberar essa fase.
+- Conversa de backend/status: concluir o status original e assumir contratos, validações e modelos/API, sem editar telas.
+- Conversa de datas/fluxo público: concluir a correção original; depois, atuar somente em `Agendar.jsx` e componentes próprios.
+- Conversa canônica de UI: concluir a UI existente e depois atuar somente em `Painel.jsx`, estilos e componentes administrativos.
 - Conversa coordenadora: handoffs, verificação do working tree e integração, sem editar os arquivos de produto em paralelo.
 
-Cada fase começa com um resumo de arquivos e comportamento para o usuário. Nenhuma conversa inicia a fase seguinte antes do handoff explícito e da aprovação do respectivo incremento.
+Antes de cada bloco, a conversa responsável informa brevemente os arquivos e o comportamento a alterar. Como a implementação da suíte foi autorizada, a próxima fase começa após o handoff da fase anterior, sem uma nova aprovação de escopo.
 
 ## Migração, compatibilidade e validação
 
@@ -109,13 +109,45 @@ Cada fase começa com um resumo de arquivos e comportamento para o usuário. Nen
 - Build frontend deve validar os fluxos públicos e administrativos; quando não houver suíte automatizada no pacote, executar verificações direcionadas e relatar claramente o que não foi testado.
 - Antes da integração, revisar o diff completo e confirmar que alterações preexistentes das outras conversas foram preservadas.
 
-## Premissas para revisão
+## Premissas aprovadas para implementação
 
 - A divisão e a ordem serial foram aprovadas pelo usuário com “divida e comece”.
+- O usuário autorizou iniciar a implementação em 2026-11-09, com a instrução para parar de planejar e começar a implementar.
 - WhatsApp será manual via `wa.me`, com estado de envio confirmado pelo operador; não haverá automação pela WhatsApp Business API neste escopo.
 - Foto por URL é a primeira entrega; upload fica condicionado à escolha de armazenamento.
 - Agendamentos antigos sem snapshot não terão comissão retroativa estimada.
 - Bloqueios recorrentes serão semanais; data final será opcional (sem data final significa recorrência contínua até remoção).
 - Recuperação de senha usará SMTP configurável por ambiente; a implementação ficará inativa até a configuração segura do provedor.
 - Benefício de fidelidade será liberado a cada 10 pontos; o admin escolhe corte grátis ou desconto no resgate.
-- Cada incremento ainda exige apresentação breve de arquivos/comportamento e aprovação explícita antes de codificar, conforme pedido do usuário.
+- Antes de codificar cada bloco, apresentar ao usuário um resumo breve dos arquivos e comportamento que serão alterados, conforme pedido.
+
+## Backlog adicional (fora dos 11 itens em implementação)
+
+O usuário pediu para colocar os itens abaixo na fila em 2026-11-09. São requisitos de backlog, não autorização para incluí-los nos blocos atuais. Manter a prioridade indicada ao criar suas próprias especificações e planos:
+
+### Alta prioridade
+
+1. Horário de trabalho individual por profissional, editável na aba Equipe e aplicado à disponibilidade pública.
+2. Fechamentos/feriados globais do salão, com motivo opcional e indisponibilidade pública.
+3. Múltiplos serviços por agendamento, somando preço e duração e validando a janela completa em fluxos público e admin.
+4. Pagamento PIX integrado ou via QR/copia-e-cola, com estados pendente/pago persistidos.
+5. Exportação Excel e/ou PDF para agendamentos, faturamento, comissões e produtos vendidos.
+
+### Média prioridade
+
+6. Avaliação pós-finalização (nota 1–5, comentário opcional) e média por profissional.
+7. Conta/consulta do cliente identificada pelo telefone, histórico e regras de remarcar/cancelar.
+8. Agendamentos recorrentes com indicador claro no painel.
+9. Estoque mínimo e alerta visual de baixo estoque.
+10. Comprovante digital após finalização, com envio opcional via WhatsApp.
+11. Histórico de no-show por cliente, indicação no agendamento e confirmação adicional opcional.
+
+### Baixa prioridade / futuro
+
+12. PWA instalável.
+13. Tema escuro coerente com a identidade existente.
+14. Integração opcional com Google Calendar.
+15. Notificações push para admin/profissionais.
+16. Campanhas por aniversário ou tempo desde a última visita via canal autorizado.
+17. Dashboard de horários de pico, ocupação, no-show e serviços mais vendidos.
+18. Preparação multi-salão, com dados isolados por unidade.

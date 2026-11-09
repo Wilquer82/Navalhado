@@ -44,26 +44,35 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
   const mes = String(req.query.mes || '').trim();
   if (!/^\d{4}-\d{2}$/.test(mes)) return respostaErro(res, 400, 'Mês inválido. Use o formato YYYY-MM.');
 
+  const isAdmin = req.auth.role === 'admin';
+  if (!isAdmin && !req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
   const inicio = new Date(`${mes}-01T00:00:00-03:00`);
   const fim = new Date(inicio);
   fim.setMonth(fim.getMonth() + 1);
 
-  const profissional = await Profissional.findById(req.auth.profissionalId).select('nome');
-  if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
+  const profissional = isAdmin
+    ? null
+    : await Profissional.findById(req.auth.profissionalId).select('nome');
+  if (!isAdmin && !profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
 
-  const agendamentos = await Appointment.find({
-    profissionalId: req.auth.profissionalId,
+  const filtroAgendamentos = {
     data: { $gte: inicio, $lt: fim },
     status: { $ne: 'cancelado' }
-  })
+  };
+  const filtroVendas = {
+    data: { $gte: inicio, $lt: fim },
+    status: { $ne: 'cancelada' }
+  };
+  if (!isAdmin) {
+    filtroAgendamentos.profissionalId = req.auth.profissionalId;
+    filtroVendas.profissionalId = req.auth.profissionalId;
+  }
+
+  const agendamentos = await Appointment.find(filtroAgendamentos)
     .populate('servicoId', 'nome preco duracaoMinutos')
     .sort({ data: 1, horarioInicio: 1 });
 
-  const vendas = await Venda.find({
-    profissionalId: req.auth.profissionalId,
-    data: { $gte: inicio, $lt: fim },
-    status: { $ne: 'cancelada' }
-  }).sort({ data: 1, createdAt: 1 });
+  const vendas = await Venda.find(filtroVendas).sort({ data: 1, createdAt: 1 });
 
   const porServico = {};
   let totalPrevistoServicos = 0;
@@ -150,7 +159,9 @@ router.get('/balanco', autenticar, asyncHandler(async (req, res) => {
   const arred = (n) => Math.round(Number(n || 0) * 100) / 100;
 
   res.json({
-    profissional: { id: profissional._id, nome: profissional.nome },
+    profissional: isAdmin
+      ? { id: null, nome: 'Salão' }
+      : { id: profissional._id, nome: profissional.nome },
     mes,
     resumo: {
       quantidadeServicos: qtdServicos,

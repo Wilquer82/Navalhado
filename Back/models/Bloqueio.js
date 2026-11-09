@@ -8,6 +8,7 @@ const bloqueioSchema = new mongoose.Schema({
   motivo: { type: String, default: '' },
   diaSemana: { type: Number, min: 0, max: 6 },
   recorrente: { type: Boolean, default: false },
+  recorrenteAte: { type: String, match: /^\d{4}-\d{2}-\d{2}$/ },
   ativo: { type: Boolean, default: true }
 }, { timestamps: true });
 

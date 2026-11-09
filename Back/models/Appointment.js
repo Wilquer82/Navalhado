@@ -11,6 +11,8 @@ const appointmentSchema = new mongoose.Schema({
   lembreteStatus: { type: String, enum: ['pendente', 'enviando', 'enviado', 'falhou', 'sem_assinatura'], default: 'pendente' },
   lembreteTentativas: { type: Number, default: 0 },
   lembreteEnviadoEm: { type: Date },
+  whatsappConfirmacaoEnviadaEm: { type: Date },
+  whatsappLembreteEnviadoEm: { type: Date },
   pushSubscription: { type: mongoose.Schema.Types.Mixed },
   nomeCliente: { type: String, required: true },
   telefoneCliente: { type: String, required: true },
@@ -25,7 +27,11 @@ const appointmentSchema = new mongoose.Schema({
     aceiteSinal: { type: Boolean, default: false }
   },
   observacoes: { type: String, default: '' },
-  status: { type: String, enum: ['pendente', 'confirmado', 'concluido', 'cancelado'], default: 'pendente' },
+  status: {
+    type: String,
+    enum: ['agendado', 'confirmado', 'em_atendimento', 'finalizado', 'cancelado', 'nao_compareceu', 'pendente', 'concluido'],
+    default: 'agendado'
+  },
   criadoEm: { type: Date, default: Date.now },
   tokenConfirmacao: { type: String, unique: true, sparse: true }
 }, { timestamps: true });

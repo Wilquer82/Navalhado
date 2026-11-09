@@ -1,6 +1,7 @@
 const express = require('express');
 const Servico = require('../models/Servico');
-const { autenticar, asyncHandler } = require('../middlewares/auth');
+const Profissional = require('../models/Profissional');
+const { autenticar, exigirAdmin, asyncHandler } = require('../middlewares/auth');
 const { validarNome, validarPreco, validarDuracao, sanitizarObjectId } = require('../services/validacoes');
 
 const router = express.Router();
@@ -17,11 +18,35 @@ const serializarServico = (s) => ({
 });
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {
-  const servicos = await Servico.find({}).sort({ nome: 1 });
-  res.json(servicos.map(serializarServico));
+  let filtro = {};
+  let vinculos = [];
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    const profissional = await Profissional.findById(req.auth.profissionalId).select('servicos.servicoId');
+    if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
+    vinculos = profissional.servicos || [];
+    const idsVinculados = await Profissional.distinct('servicos.servicoId', {
+      'servicos.servicoId': { $exists: true }
+    });
+    filtro = {
+      ativo: true,
+      $or: [
+        { _id: { $in: vinculos.map(item => item.servicoId) } },
+        { _id: { $nin: idsVinculados } }
+      ]
+    };
+  }
+  const servicos = await Servico.find(filtro).sort({ nome: 1 });
+  res.json(servicos.map(servico => {
+    const dados = serializarServico(servico);
+    const vinculo = vinculos.find(item => String(item.servicoId) === String(servico._id));
+    return vinculo
+      ? { ...dados, preco: vinculo.preco, duracaoMinutos: vinculo.duracaoMinutos, duracao: vinculo.duracaoMinutos }
+      : dados;
+  }));
 }));
 
-router.post('/', autenticar, asyncHandler(async (req, res) => {
+router.post('/', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
   const { nome, preco, duracaoMinutos, duracao, ativo } = req.body || {};
   if (!validarNome(nome)) return respostaErro(res, 400, 'Nome deve ter pelo menos 3 caracteres.');
   if (!validarPreco(preco)) return respostaErro(res, 400, 'Preço inválido.');
@@ -37,7 +62,7 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
   res.status(201).json(serializarServico(servico));
 }));
 
-router.put('/:id', autenticar, asyncHandler(async (req, res) => {
+router.put('/:id', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
   const servico = await Servico.findById(id);
@@ -61,7 +86,7 @@ router.put('/:id', autenticar, asyncHandler(async (req, res) => {
   res.json(serializarServico(servico));
 }));
 
-router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
+router.delete('/:id', autenticar, exigirAdmin, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
   const servico = await Servico.findByIdAndUpdate(id, { ativo: false }, { new: true });

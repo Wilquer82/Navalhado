@@ -1,5 +1,6 @@
 const express = require('express');
 const Produto = require('../models/Produto');
+const Profissional = require('../models/Profissional');
 const Venda = require('../models/Venda');
 const { autenticar, asyncHandler } = require('../middlewares/auth');
 const { dataValida, dataBanco, formatarDataAPI, sanitizarObjectId } = require('../services/validacoes');
@@ -22,10 +23,11 @@ const serializarVenda = (v) => ({
 router.get('/', autenticar, asyncHandler(async (req, res) => {
   const mes = typeof req.query.mes === 'string' ? req.query.mes.trim() : '';
   const data = typeof req.query.data === 'string' ? req.query.data.trim() : '';
-  const query = {
-    profissionalId: req.auth.profissionalId,
-    status: { $ne: 'cancelada' }
-  };
+  const query = { status: { $ne: 'cancelada' } };
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    query.profissionalId = req.auth.profissionalId;
+  }
 
   if (data) {
     if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
@@ -51,9 +53,22 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
   const itensEntrada = Array.isArray(body.itens) ? body.itens : [];
   const nomeCliente = String(body.nomeCliente || '').trim();
   const observacoes = String(body.observacoes || '').trim();
+  const profissionalId = req.auth.role === 'admin'
+    ? sanitizarObjectId(body.profissionalId)
+    : req.auth.profissionalId;
 
   if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
   if (!itensEntrada.length) return respostaErro(res, 400, 'Adicione pelo menos um produto.');
+  if (!profissionalId) {
+    return respostaErro(
+      res,
+      req.auth.role === 'admin' ? 400 : 403,
+      req.auth.role === 'admin' ? 'Profissional é obrigatório para registrar a venda.' : 'Acesso negado.'
+    );
+  }
+  if (!await Profissional.exists({ _id: profissionalId })) {
+    return respostaErro(res, 404, 'Profissional não encontrado.');
+  }
 
   const itens = [];
   let total = 0;
@@ -91,7 +106,7 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
   total = Math.round(total * 100) / 100;
 
   const venda = new Venda({
-    profissionalId: req.auth.profissionalId,
+    profissionalId,
     itens,
     total,
     nomeCliente,
@@ -106,11 +121,12 @@ router.post('/', autenticar, asyncHandler(async (req, res) => {
 router.delete('/:id', autenticar, asyncHandler(async (req, res) => {
   const id = sanitizarObjectId(req.params.id);
   if (!id) return respostaErro(res, 400, 'ID inválido.');
-  const venda = await Venda.findOne({
-    _id: id,
-    profissionalId: req.auth.profissionalId,
-    status: { $ne: 'cancelada' }
-  });
+  const filtro = { _id: id, status: { $ne: 'cancelada' } };
+  if (req.auth.role !== 'admin') {
+    if (!req.auth.profissionalId) return respostaErro(res, 403, 'Acesso negado.');
+    filtro.profissionalId = req.auth.profissionalId;
+  }
+  const venda = await Venda.findOne(filtro);
   if (!venda) return respostaErro(res, 404, 'Venda não encontrada.');
 
   for (const item of venda.itens) {

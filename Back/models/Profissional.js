@@ -4,6 +4,8 @@ const profissionalSchema = new mongoose.Schema({
   nome: { type: String, required: true },
   foto: { type: String, default: '' },
   descricao: { type: String, default: 'Geral' },
+  especialidade: { type: String, trim: true, default: '' },
+  bio: { type: String, trim: true, maxlength: 120, default: '' },
   telefone: { type: String, default: '' },
   chavePix: { type: String, default: '' },
   servicos: [{

@@ -41,24 +41,57 @@ function folga(profissional, data) {
 }
 
 async function servicoDoProfissional(profissional, servicoId) {
-  const vinculo = profissional.servicos.find(item => String(item.servicoId) === String(servicoId));
-  if (!vinculo) return null;
   const servico = await Servico.findOne({ _id: servicoId, ativo: true });
-  return servico ? { servico, vinculo } : null;
+  if (!servico) return null;
+  const vinculo = profissional.servicos.find(item => String(item.servicoId) === String(servicoId));
+  if (vinculo) return { servico, vinculo };
+  const possuiVinculos = await Profissional.exists({ 'servicos.servicoId': servicoId });
+  return resolverServicoDoProfissional(profissional, servico, Boolean(possuiVinculos));
+}
+
+function resolverServicoDoProfissional(profissional, servico, possuiVinculos) {
+  if (!servico) return null;
+  const vinculo = (profissional.servicos || []).find(item => String(item.servicoId) === String(servico._id));
+  if (vinculo) return { servico, vinculo };
+  if (possuiVinculos) return null;
+  return {
+    servico,
+    vinculo: {
+      servicoId: servico._id,
+      preco: servico.preco,
+      duracaoMinutos: servico.duracaoMinutos
+    }
+  };
 }
 
 function linkWhatsApp(numero, mensagem) {
-  const telefone = String(numero || '').replace(/\D/g, '');
-  return telefone ? `https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}` : null;
+  const valor = String(numero || '').trim();
+  let telefone = valor.replace(/\D/g, '');
+  if (!telefone) return null;
+
+  if (valor.startsWith('+')) {
+    // wa.me expects the international number without the leading plus.
+  } else if (telefone.startsWith('00')) {
+    telefone = telefone.slice(2);
+  } else if (!telefone.startsWith('55') || telefone.length < 12) {
+    telefone = `55${telefone}`;
+  }
+
+  return `https://wa.me/${telefone}?text=${encodeURIComponent(mensagem)}`;
 }
 
 async function linksNotificacao(agendamento, profissional, servico) {
   const data = formatarDataAPI(agendamento.data);
-  const cliente = `Olá! Agendamento solicitado: ${profissional.nome} — ${servico.nome} — ${data} às ${agendamento.horarioInicio}. Aguarde confirmação.`;
+  const nomeSalao = 'Salão Navalhado';
+  const cliente = `Olá! Sua solicitação de agendamento no ${nomeSalao} foi recebida: ${servico.nome} com ${profissional.nome}, em ${data} às ${agendamento.horarioInicio}. Aguarde confirmação.`;
+  const confirmacao = `Olá, ${agendamento.nomeCliente}! Seu agendamento no ${nomeSalao} está confirmado: ${servico.nome} com ${profissional.nome}, em ${data} às ${agendamento.horarioInicio}.`;
+  const lembrete = `Olá, ${agendamento.nomeCliente}! Lembramos do seu agendamento no ${nomeSalao}: ${servico.nome} com ${profissional.nome}, em ${data} às ${agendamento.horarioInicio}.`;
   const confirmar = `${process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 5000}`}/api/agendamentos/confirmar/${agendamento.tokenConfirmacao}`;
-  const profissionalMensagem = `NOVO AGENDAMENTO: ${agendamento.nomeCliente} — ${servico.nome} — ${data} às ${agendamento.horarioInicio}. Para confirmar: ${confirmar}`;
+  const profissionalMensagem = `NOVO AGENDAMENTO no ${nomeSalao}: ${agendamento.nomeCliente} — ${servico.nome} — com ${profissional.nome}, em ${data} às ${agendamento.horarioInicio}. Para confirmar: ${confirmar}`;
   return {
     whatsappCliente: linkWhatsApp(agendamento.telefoneCliente, cliente),
+    whatsappConfirmacao: linkWhatsApp(agendamento.telefoneCliente, confirmacao),
+    whatsappLembrete: linkWhatsApp(agendamento.telefoneCliente, lembrete),
     whatsappProfissional: linkWhatsApp(profissional.telefone, profissionalMensagem),
     linkConfirmacao: confirmar
   };
@@ -66,19 +99,16 @@ async function linksNotificacao(agendamento, profissional, servico) {
 
 async function verificarBloqueios(profissionalId, data, horarioInicio, horarioFim) {
   const bloqueios = await Bloqueio.find({ profissionalId, ativo: true });
-  const dia = diaSemana(data);
-  for (const bloqueio of bloqueios) {
-    let afeta = false;
-    if (bloqueio.recorrente) {
-      if (bloqueio.diaSemana === dia) afeta = true;
-    } else if (bloqueio.data === data) {
-      afeta = true;
-    }
-    if (!afeta) continue;
-    if (!bloqueio.horarioInicio || !bloqueio.horarioFim) return true;
-    if (horariosSobrepostos(horarioInicio, horarioFim, bloqueio.horarioInicio, bloqueio.horarioFim)) return true;
-  }
-  return false;
+  return bloqueios.some(bloqueio => bloqueioAfetaHorario(bloqueio, data, horarioInicio, horarioFim));
+}
+
+function bloqueioAfetaHorario(bloqueio, data, horarioInicio, horarioFim) {
+  const diaAfetado = bloqueio.recorrente
+    ? bloqueio.diaSemana === diaSemana(data) && (!bloqueio.recorrenteAte || data <= bloqueio.recorrenteAte)
+    : bloqueio.data === data;
+  if (!diaAfetado) return false;
+  if (!bloqueio.horarioInicio || !bloqueio.horarioFim) return true;
+  return horariosSobrepostos(horarioInicio, horarioFim, bloqueio.horarioInicio, bloqueio.horarioFim);
 }
 
 async function horariosDisponiveis(profissional, data, servicoId, config) {
@@ -108,9 +138,7 @@ async function horariosDisponiveis(profissional, data, servicoId, config) {
     const horarioInicio = horario(inicio);
     const horarioFim = horario(fim);
     const bloqueado = bloqueios.some(bloqueio =>
-      !bloqueio.horarioInicio
-      || !bloqueio.horarioFim
-      || horariosSobrepostos(horarioInicio, horarioFim, bloqueio.horarioInicio, bloqueio.horarioFim)
+      bloqueioAfetaHorario(bloqueio, data, horarioInicio, horarioFim)
     );
     if (bloqueado) continue;
     const conflita = ocupados.some(item => horariosSobrepostos(inicio, fim, minutos(item.horarioInicio), minutos(item.horarioFim) + intervalo));
@@ -164,7 +192,10 @@ module.exports = {
   horarioDoProfissional,
   folga,
   servicoDoProfissional,
+  resolverServicoDoProfissional,
+  linkWhatsApp,
   linksNotificacao,
+  bloqueioAfetaHorario,
   verificarBloqueios,
   horariosDisponiveis,
   validarAgendamento,
