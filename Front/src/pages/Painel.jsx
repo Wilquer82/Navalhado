@@ -164,8 +164,10 @@ export default function Painel() {
           <input type="date" value={dataFiltro} onChange={e => setDataFiltro(e.target.value)}
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ddd', marginBottom: 12 }} />
           {agendamentos.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#999', padding: 40 }}>Nenhum agendamento.</p>
-           <button style={{marginTop: 12, background: "#2d3748", color: "#fff", padding: "8px 16px", border: "none", borderRadius: 4, cursor: "pointer"]} onClick={() => setAba("agendamentos")>Criar agendamento</button>
+            <>
+              <p style={{ textAlign: 'center', color: '#999', padding: 40 }}>Nenhum agendamento.</p>
+              <button style={{ marginTop: 12, background: "#2d3748", color: "#fff", padding: "8px 16px", border: "none", borderRadius: 4, cursor: "pointer" }} onClick={() => setAba("agendamentos")}>Criar agendamento</button>
+            </>
           ) : agendamentos.map(a => (
             <div key={a._id} className="appointment-item">
               <div className="top">
