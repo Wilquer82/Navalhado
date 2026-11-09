@@ -719,6 +719,7 @@ body {
 .appointments-list { display: grid; gap: 10px; }
 .appointment-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -788,6 +789,7 @@ body {
 .appointment-actions .appointment-primary-button,
 .appointment-actions .appointment-cancel-button { min-height: 36px; padding: 0 12px; }
 .appointment-whatsapp {
+  flex: 1 1 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 10px 20px;
@@ -812,6 +814,70 @@ body {
   font-weight: 600;
 }
 .appointment-whatsapp-status {
+  color: #778291;
+  font-size: 11px;
+}
+.client-history-lookup,
+.appointment-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+  padding: 10px 11px;
+  border: 1px solid #e8ebef;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+.appointment-history { flex: 1 1 100%; }
+.client-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.client-history-heading strong {
+  color: #455160;
+  font-size: 12px;
+}
+.client-history-heading button,
+.appointment-history-toggle {
+  padding: 5px 8px;
+  border: 1px solid #dfe4ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #526174;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+.client-history-heading button:hover,
+.appointment-history-toggle:hover { border-color: #9daaba; }
+.appointment-history-toggle { justify-self: start; }
+.client-history-message {
+  margin: 0;
+  color: #778291;
+  font-size: 12px;
+}
+.client-history-error { color: #a9433b; }
+.client-history-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.client-history-list li {
+  display: grid;
+  gap: 2px;
+  padding-top: 7px;
+  border-top: 1px solid #e8ebef;
+}
+.client-history-list li:first-child { padding-top: 0; border-top: 0; }
+.client-history-list strong {
+  color: #3d4958;
+  font-size: 12px;
+}
+.client-history-list span {
   color: #778291;
   font-size: 11px;
 }

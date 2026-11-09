@@ -6,6 +6,7 @@ const {
   dataValida,
   horarioValido,
   normalizarTelefone,
+  normalizarTelefoneBrasileiro,
   validarNome,
   dataBanco,
   minutos,
@@ -66,6 +67,7 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   if (!dataValida(data)) return respostaErro(res, 400, 'Data inválida.');
   if (!horarioValido(horarioInicio)) return respostaErro(res, 400, 'Horário inválido.');
   if (normalizarTelefone(telefoneCliente).length < 10) return respostaErro(res, 400, 'Telefone inválido.');
+  const telefoneNormalizado = normalizarTelefoneBrasileiro(telefoneCliente);
   const profissional = await Profissional.findOne({ _id: profissionalId, ativo: true });
   if (!profissional) return respostaErro(res, 404, 'Profissional não encontrado.');
   const vinculo = await servicoDoProfissional(profissional, servicoId);
@@ -102,6 +104,7 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
     pushSubscription,
     nomeCliente,
     telefoneCliente,
+    ...(telefoneNormalizado ? { telefoneNormalizado } : {}),
     observacoes,
     pagamento,
     status: 'agendado',
@@ -115,8 +118,10 @@ router.post('/', autenticarOpcional, asyncHandler(async (req, res) => {
   }
   const { whatsappCliente, whatsappProfissional, linkConfirmacao } =
     await linksNotificacao(agendamento, profissional, vinculo.servico);
+  const dadosAgendamento = serializarAgendamento(agendamento, profissional, vinculo.servico);
+  delete dadosAgendamento.telefoneNormalizado;
   res.status(201).json({
-    ...serializarAgendamento(agendamento, profissional, vinculo.servico),
+    ...dadosAgendamento,
     ...(usarSinalPix ? { chavePix: profissional.chavePix } : {}),
     whatsappCliente,
     whatsappProfissional,
@@ -136,6 +141,46 @@ router.get('/confirmar/:token', autenticarOpcional, asyncHandler(async (req, res
   ).populate('profissionalId', 'nome').populate('servicoId', 'nome preco duracaoMinutos');
   if (!agendamento) return respostaErro(res, 404, 'Link inválido ou agendamento já confirmado.');
   res.json({ mensagem: 'Agendamento confirmado com sucesso.' });
+}));
+
+router.get('/historico', autenticar, asyncHandler(async (req, res) => {
+  if (req.auth.role !== 'admin') return respostaErro(res, 403, 'Apenas administradores podem consultar o histórico.');
+  const telefone = typeof req.query.telefone === 'string' ? req.query.telefone.trim() : '';
+  const telefoneNormalizado = normalizarTelefoneBrasileiro(telefone);
+  if (!telefoneNormalizado) return respostaErro(res, 400, 'Telefone inválido.');
+
+  const numeroNacional = telefoneNormalizado.slice(2);
+  const telefoneLegado = new RegExp(
+    `^\\D*(?:(?:00)?55\\D*)?${numeroNacional.split('').join('\\D*')}\\D*$`
+  );
+  const agendamentos = await Appointment.find({
+    status: { $in: ['finalizado', 'concluido'] },
+    $or: [
+      { telefoneNormalizado },
+      { telefoneCliente: telefoneLegado }
+    ]
+  })
+    .populate('profissionalId', 'nome')
+    .populate('servicoId', 'nome preco duracaoMinutos')
+    .sort({ data: -1, horarioInicio: -1, createdAt: -1 })
+    .limit(5);
+
+  res.json(agendamentos.map(agendamento => {
+    const serializado = serializarAgendamento(
+      agendamento,
+      agendamento.profissionalId,
+      agendamento.servicoId
+    );
+    return {
+      _id: serializado._id,
+      nomeCliente: serializado.nomeCliente,
+      data: serializado.data,
+      horario: serializado.horario,
+      profissional: serializado.profissional,
+      servico: serializado.servico,
+      status: serializado.status
+    };
+  }));
 }));
 
 router.get('/', autenticar, asyncHandler(async (req, res) => {

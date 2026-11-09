@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AbaProdutos, AbaVendas } from './ProdutosVendas';
 import CampoData from '../components/CampoData';
@@ -25,6 +25,14 @@ const formProfissionalVazio = {
   telefone: '',
   chavePix: ''
 };
+const formatarDataHistorico = valor => {
+  const dataISO = String(valor || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataISO)) return 'Data indisponível';
+  const data = new Date(`${dataISO}T12:00:00`);
+  return Number.isNaN(data.getTime())
+    ? 'Data indisponível'
+    : data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+};
 
 function AvatarProfissional({ nome, foto, className = '' }) {
   const [imagemFalhou, setImagemFalhou] = useState(false);
@@ -50,6 +58,32 @@ function AvatarProfissional({ nome, foto, className = '' }) {
   );
 }
 
+function HistoricoCliente({ estado }) {
+  if (!estado) {
+    return <p className="client-history-message">Aguardando consulta automática...</p>;
+  }
+  if (estado.status === 'loading') {
+    return <p className="client-history-message">Carregando últimos atendimentos...</p>;
+  }
+  if (estado.status === 'error') {
+    return <p className="client-history-message client-history-error" role="alert">{estado.erro}</p>;
+  }
+  if (!estado.dados?.length) {
+    return <p className="client-history-message">Nenhum atendimento finalizado encontrado.</p>;
+  }
+
+  return (
+    <ul className="client-history-list">
+      {estado.dados.map((item, index) => (
+        <li key={item._id || `${item.data}-${item.horario || item.horarioInicio || index}`}>
+          <strong>{formatarDataHistorico(item.data)}{item.horario || item.horarioInicio ? ` · ${item.horario || item.horarioInicio}` : ''}</strong>
+          <span>{item.servico?.nome || 'Serviço não informado'} · {item.profissional?.nome || 'Profissional não informado'}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function Painel() {
   const [aba, setAba] = useState('agendamentos');
   const [agendamentos, setAgendamentos] = useState([]);
@@ -69,6 +103,11 @@ export default function Painel() {
   const [horariosDisponiveis, setHorariosDisponiveis] = useState([]);
   const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [erroHorarios, setErroHorarios] = useState('');
+  const [historicosClientes, setHistoricosClientes] = useState({});
+  const [historicoExpandido, setHistoricoExpandido] = useState('');
+  const historicosCache = useRef(new Map());
+  const historicosRequisicoes = useRef(new Map());
+  const historicosConsumidores = useRef(new Map());
   const [statusEmAtualizacao, setStatusEmAtualizacao] = useState('');
   const [whatsappEmRegistro, setWhatsappEmRegistro] = useState('');
   const [erroAgendamentos, setErroAgendamentos] = useState('');
@@ -110,6 +149,111 @@ export default function Painel() {
     if (!res.ok) throw new Error(dado?.erro || `Erro (${res.status})`);
     return dado;
   };
+
+  const atualizarHistoricoCliente = (chave, estado) => {
+    setHistoricosClientes(atual => {
+      const proximo = { ...atual, [chave]: estado };
+      const chaves = Object.keys(proximo);
+      if (chaves.length > 30) delete proximo[chaves[0]];
+      return proximo;
+    });
+  };
+
+  const consultarHistorico = (telefone, consumidor) => {
+    const chave = String(telefone || '').replace(/\D/g, '');
+    if (chave.length < 10 || !isAdmin) return Promise.resolve();
+
+    let consumidores = historicosConsumidores.current.get(chave);
+    if (!consumidores) {
+      consumidores = new Set();
+      historicosConsumidores.current.set(chave, consumidores);
+    }
+    consumidores.add(consumidor);
+
+    const emCache = historicosCache.current.get(chave);
+    if (emCache) {
+      historicosCache.current.delete(chave);
+      historicosCache.current.set(chave, emCache);
+      atualizarHistoricoCliente(chave, { status: 'loaded', dados: emCache });
+      return Promise.resolve(emCache);
+    }
+
+    const requisicaoExistente = historicosRequisicoes.current.get(chave);
+    if (requisicaoExistente) return requisicaoExistente.promise;
+
+    const controller = new AbortController();
+    atualizarHistoricoCliente(chave, { status: 'loading', dados: [] });
+    const requisicao = { controller, promise: null };
+    requisicao.promise = (async () => {
+      try {
+        const dados = await apiFetch(`${API}/agendamentos/historico?telefone=${encodeURIComponent(chave)}`, {
+          signal: controller.signal
+        });
+        if (!Array.isArray(dados)) throw new Error('Resposta inválida ao carregar histórico do cliente.');
+        if (controller.signal.aborted) return [];
+        const historico = dados.slice(0, 5);
+        historicosCache.current.delete(chave);
+        historicosCache.current.set(chave, historico);
+        if (historicosCache.current.size > 30) {
+          historicosCache.current.delete(historicosCache.current.keys().next().value);
+        }
+        atualizarHistoricoCliente(chave, { status: 'loaded', dados: historico });
+        return historico;
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          atualizarHistoricoCliente(chave, { status: 'error', dados: [], erro: e.message || 'Não foi possível carregar o histórico.' });
+        }
+        return [];
+      } finally {
+        if (historicosRequisicoes.current.get(chave) === requisicao) {
+          historicosRequisicoes.current.delete(chave);
+        }
+      }
+    })();
+    historicosRequisicoes.current.set(chave, requisicao);
+    return requisicao.promise;
+  };
+
+  const liberarHistorico = (telefone, consumidor) => {
+    const chave = String(telefone || '').replace(/\D/g, '');
+    const consumidores = historicosConsumidores.current.get(chave);
+    if (!consumidores) return;
+    consumidores.delete(consumidor);
+    if (consumidores.size) return;
+    historicosConsumidores.current.delete(chave);
+    const requisicao = historicosRequisicoes.current.get(chave);
+    if (requisicao) {
+      historicosRequisicoes.current.delete(chave);
+      requisicao.controller.abort();
+    }
+  };
+
+  const limparHistoricosCache = () => {
+    historicosRequisicoes.current.forEach(requisicao => requisicao.controller.abort());
+    historicosRequisicoes.current.clear();
+    historicosConsumidores.current.clear();
+    historicosCache.current.clear();
+  };
+
+  useEffect(() => () => limparHistoricosCache(), []);
+
+  const telefoneManualNormalizado = formManual.telefoneCliente.replace(/\D/g, '');
+  useEffect(() => {
+    if (!isAdmin || aba !== 'agendamentos' || !mostrarFormManual || telefoneManualNormalizado.length < 10) return undefined;
+    const consumidor = 'form-manual';
+    const timer = window.setTimeout(() => consultarHistorico(telefoneManualNormalizado, consumidor), 450);
+    return () => {
+      window.clearTimeout(timer);
+      liberarHistorico(telefoneManualNormalizado, consumidor);
+    };
+  }, [aba, isAdmin, mostrarFormManual, telefoneManualNormalizado]);
+
+  useEffect(() => {
+    if (!isAdmin || aba !== 'agendamentos' || !historicoExpandido) return undefined;
+    const consumidor = `card-${historicoExpandido}`;
+    consultarHistorico(historicoExpandido, consumidor);
+    return () => liberarHistorico(historicoExpandido, consumidor);
+  }, [aba, isAdmin, historicoExpandido]);
 
   useEffect(() => {
     if (aba === 'agendamentos') {
@@ -502,6 +646,17 @@ export default function Painel() {
                 <label>
                   <span>Telefone</span>
                   <input type="tel" value={formManual.telefoneCliente} onChange={e => setFormManual({ ...formManual, telefoneCliente: e.target.value })} placeholder="(00) 00000-0000" required />
+                  {telefoneManualNormalizado.length >= 10 && (
+                    <div className="client-history-lookup">
+                      <div className="client-history-heading">
+                        <strong>Histórico do cliente</strong>
+                        <button type="button" onClick={() => consultarHistorico(telefoneManualNormalizado, 'form-manual')}>
+                          Consultar agora
+                        </button>
+                      </div>
+                      <HistoricoCliente estado={historicosClientes[telefoneManualNormalizado]} />
+                    </div>
+                  )}
                 </label>
                 <label>
                   <span>Profissional</span>
@@ -701,6 +856,24 @@ export default function Painel() {
                       );
                     })}
                   </div>
+                  {isAdmin && (() => {
+                    const telefone = String(a.telefoneCliente || a.telefone || '').replace(/\D/g, '');
+                    if (telefone.length < 10) return null;
+                    const expandido = historicoExpandido === telefone;
+                    return (
+                      <div className="appointment-history">
+                        <button
+                          type="button"
+                          className="appointment-history-toggle"
+                          aria-expanded={expandido}
+                          onClick={() => setHistoricoExpandido(expandido ? '' : telefone)}
+                        >
+                          {expandido ? 'Ocultar histórico' : 'Últimos atendimentos'}
+                        </button>
+                        {expandido && <HistoricoCliente estado={historicosClientes[telefone]} />}
+                      </div>
+                    );
+                  })()}
                 </article>
               ))}
             </div>

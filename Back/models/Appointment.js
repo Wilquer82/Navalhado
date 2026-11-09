@@ -16,6 +16,7 @@ const appointmentSchema = new mongoose.Schema({
   pushSubscription: { type: mongoose.Schema.Types.Mixed },
   nomeCliente: { type: String, required: true },
   telefoneCliente: { type: String, required: true },
+  telefoneNormalizado: { type: String, default: undefined },
   pagamento: {
     tipo: { type: String, enum: ['integral', 'sinal_pix'], default: 'integral' },
     valorOriginal: { type: Number, min: 0 },
@@ -40,5 +41,6 @@ appointmentSchema.index(
   { profissionalId: 1, data: 1, horarioInicio: 1 },
   { unique: true, partialFilterExpression: { status: { $ne: 'cancelado' } } }
 );
+appointmentSchema.index({ telefoneNormalizado: 1, status: 1, data: -1 });
 
 module.exports = mongoose.model('Appointment', appointmentSchema);

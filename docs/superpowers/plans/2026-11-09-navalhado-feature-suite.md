@@ -95,9 +95,9 @@
 - Produces: Optional appointment observation; a pre-submit review with professional, service, price, duration, date/time, customer name/phone, and observation; a success view with the saved appointment summary and a professional WhatsApp action.
 
 - [x] Add validation for observation length and tests for persistence/serialization of absent, present, boundary, and invalid observations (500-character maximum).
-- [ ] Implement the review and success states using server-returned appointment values.
-- [ ] Generate an encoded WhatsApp link to the selected professional only when their contact is configured; present a clear unavailable state otherwise.
-- [ ] Build `Front` and verify the existing public booking path remains usable.
+- [x] Implement the review and success states using server-returned appointment values.
+- [x] Generate an encoded WhatsApp link to the selected professional only when their contact is configured; present a clear unavailable state otherwise.
+- [x] Build `Front` and verify the existing public booking path remains usable.
 
 ### Task 4: Add Confirmation and Reminder WhatsApp Actions
 
@@ -113,7 +113,7 @@
 
 - [x] Add tests for phone normalization, message URL encoding, and different confirmation/reminder copy.
 - [x] Add an authorized endpoint to record an operator-confirmed message type and timestamp.
-- [ ] Add the public/admin confirmation and admin reminder actions with visible sent indicators.
+- [x] Add admin confirmation/reminder actions with visible sent indicators; public success has a customer-authored WhatsApp summary action (Task 3).
 - [x] Build `Front` and verify missing phone/configuration is surfaced rather than producing a broken link.
 
 ### Task 5: Complete Admin Manual Booking and Appointment History
@@ -128,7 +128,7 @@
 - Produces: An admin-only manual create flow accepting professional, service, date, currently free time, customer name/phone, and observation; history is derived from the last five finalized appointments for the normalized phone.
 
 - [ ] Add route checks for incomplete input, unauthorized role, and a slot that became occupied after it was listed.
-- [ ] Load actual available times when the admin selects professional, service, and date.
+- [x] Load actual available times when the admin selects professional, service, and date.
 - [ ] Display the last five finalized visits for the customer phone when creating or viewing an appointment.
 - [ ] Verify conflict responses are clear and no appointment is saved on a stale slot.
 

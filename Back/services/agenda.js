@@ -175,6 +175,7 @@ function serializarAgendamento(agendamento, profissional, servico) {
   delete dadosPublicos.lembreteStatus;
   delete dadosPublicos.lembreteTentativas;
   delete dadosPublicos.lembreteEnviadoEm;
+  delete dadosPublicos.telefoneNormalizado;
   return {
     ...dadosPublicos,
     data: formatarDataAPI(dadosPublicos.data),

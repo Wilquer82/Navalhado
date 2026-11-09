@@ -34,6 +34,18 @@ const horariosSobrepostos = (inicioA, fimA, inicioB, fimB) => inicioA < fimB && 
 
 const normalizarTelefone = (telefone) => String(telefone || '').replace(/\D/g, '');
 
+const normalizarTelefoneBrasileiro = (telefone) => {
+  let digitos = normalizarTelefone(telefone);
+  if (digitos.startsWith('00')) digitos = digitos.slice(2);
+
+  if (digitos.startsWith('55')) {
+    const numeroNacional = digitos.slice(2);
+    return [10, 11].includes(numeroNacional.length) ? `55${numeroNacional}` : null;
+  }
+
+  return [10, 11].includes(digitos.length) ? `55${digitos}` : null;
+};
+
 const validarNome = (nome) => String(nome || '').trim().length >= 3;
 
 const validarPreco = (preco) => Number(preco) >= 0;
@@ -90,6 +102,7 @@ module.exports = {
   horarioValido,
   horariosSobrepostos,
   normalizarTelefone,
+  normalizarTelefoneBrasileiro,
   validarNome,
   validarPreco,
   validarDuracao,

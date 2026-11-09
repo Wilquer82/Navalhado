@@ -160,6 +160,8 @@ test('public appointment creation does not expose WhatsApp confirmation or remin
   assert.ok(resultado.linkConfirmacao);
   assert.equal(resultado.observacoes, 'Cliente prefere corte curto.');
   assert.equal(savedAppointments[0].observacoes, 'Cliente prefere corte curto.');
+  assert.equal(savedAppointments[0].telefoneNormalizado, '5511999998888');
+  assert.equal(Object.hasOwn(resultado, 'telefoneNormalizado'), false);
 
   const respostaSemObservacoes = await criarAgendamento({});
   assert.equal(respostaSemObservacoes.status, 201);
