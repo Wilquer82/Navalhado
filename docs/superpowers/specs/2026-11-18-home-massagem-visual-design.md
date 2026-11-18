@@ -1,6 +1,6 @@
 # Redesign visual do Navalhado inspirado no Home Massagem
 
-**Status:** proposta aprovada em conversa; aguardando revisão desta especificação antes do plano de implementação.
+**Status:** especificação aprovada pelo usuário; plano de implementação em revisão.
 
 ## Objetivo
 
