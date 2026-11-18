@@ -1,0 +1,62 @@
+[     556ms] [ERROR] The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element. @ http://127.0.0.1:3000/:18
+[     787ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:21549
+[     937ms] [LOG] ✅ PWA Service Worker registrado @ http://127.0.0.1:3000/src/main.jsx:95
+[    1291ms] [WARNING] ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition. @ http://127.0.0.1:3000/node_modules/.vite/deps/react-router-dom.js?v=cd099bb1:4415
+[    1291ms] [WARNING] ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath. @ http://127.0.0.1:3000/node_modules/.vite/deps/react-router-dom.js?v=cd099bb1:4415
+[    2370ms] [ERROR] Access to fetch at 'https://navalhadoback-v81k.onrender.com/api/profissionais' from origin 'http://127.0.0.1:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://127.0.0.1:3000/:1
+[    2372ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://navalhadoback-v81k.onrender.com/api/profissionais:1
+[    2372ms] [LOG] Erro ao carregar dados iniciais: TypeError: Failed to fetch
+    at http://127.0.0.1:3000/src/pages/Agendar.jsx:205:5
+    at commitHookEffectListMount (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:16913:34)
+    at commitPassiveMountOnFiber (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18154:19)
+    at commitPassiveMountEffects_complete (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18127:17)
+    at commitPassiveMountEffects_begin (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18117:15)
+    at commitPassiveMountEffects (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18107:11)
+    at flushPassiveEffectsImpl (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19488:11)
+    at flushPassiveEffects (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19445:22)
+    at http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19326:17
+    at workLoop (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:195:42) @ http://127.0.0.1:3000/src/pages/Agendar.jsx:211
+[    2814ms] [ERROR] Access to fetch at 'https://navalhadoback-v81k.onrender.com/api/profissionais' from origin 'http://127.0.0.1:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://127.0.0.1:3000/:1
+[    2814ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://navalhadoback-v81k.onrender.com/api/profissionais:1
+[    2814ms] [LOG] Erro ao carregar dados iniciais: TypeError: Failed to fetch
+    at http://127.0.0.1:3000/src/pages/Agendar.jsx:205:5
+    at commitHookEffectListMount (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:16913:34)
+    at invokePassiveEffectMountInDEV (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18322:19)
+    at invokeEffectsInDev (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19699:19)
+    at commitDoubleInvokeEffectsInDEV (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19684:15)
+    at flushPassiveEffectsImpl (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19501:13)
+    at flushPassiveEffects (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19445:22)
+    at http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19326:17
+    at workLoop (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:195:42)
+    at flushWork (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:174:22) @ http://127.0.0.1:3000/src/pages/Agendar.jsx:211
+[  117874ms] [ERROR] The Content Security Policy directive 'frame-ancestors' is ignored when delivered via a <meta> element. @ http://127.0.0.1:3000/:18
+[  118315ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:21549
+[  118602ms] [LOG] ✅ PWA Service Worker registrado @ http://127.0.0.1:3000/src/main.jsx?t=1795033378537:95
+[  118672ms] [WARNING] ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition. @ http://127.0.0.1:3000/node_modules/.vite/deps/react-router-dom.js?v=cd099bb1:4415
+[  118672ms] [WARNING] ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath. @ http://127.0.0.1:3000/node_modules/.vite/deps/react-router-dom.js?v=cd099bb1:4415
+[  119528ms] [ERROR] Access to fetch at 'https://navalhadoback-v81k.onrender.com/api/profissionais' from origin 'http://127.0.0.1:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://127.0.0.1:3000/:1
+[  119528ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://navalhadoback-v81k.onrender.com/api/profissionais:1
+[  119529ms] [LOG] Erro ao carregar dados iniciais: TypeError: Failed to fetch
+    at http://127.0.0.1:3000/src/pages/Agendar.jsx:205:5
+    at commitHookEffectListMount (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:16913:34)
+    at commitPassiveMountOnFiber (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18154:19)
+    at commitPassiveMountEffects_complete (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18127:17)
+    at commitPassiveMountEffects_begin (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18117:15)
+    at commitPassiveMountEffects (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18107:11)
+    at flushPassiveEffectsImpl (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19488:11)
+    at flushPassiveEffects (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19445:22)
+    at http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19326:17
+    at workLoop (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:195:42) @ http://127.0.0.1:3000/src/pages/Agendar.jsx:211
+[  119956ms] [ERROR] Access to fetch at 'https://navalhadoback-v81k.onrender.com/api/profissionais' from origin 'http://127.0.0.1:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://127.0.0.1:3000/:1
+[  119956ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://navalhadoback-v81k.onrender.com/api/profissionais:1
+[  119956ms] [LOG] Erro ao carregar dados iniciais: TypeError: Failed to fetch
+    at http://127.0.0.1:3000/src/pages/Agendar.jsx:205:5
+    at commitHookEffectListMount (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:16913:34)
+    at invokePassiveEffectMountInDEV (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:18322:19)
+    at invokeEffectsInDev (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19699:19)
+    at commitDoubleInvokeEffectsInDEV (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19684:15)
+    at flushPassiveEffectsImpl (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19501:13)
+    at flushPassiveEffects (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19445:22)
+    at http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:19326:17
+    at workLoop (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:195:42)
+    at flushWork (http://127.0.0.1:3000/node_modules/.vite/deps/chunk-XPR23Y44.js?v=c6bcc5f8:174:22) @ http://127.0.0.1:3000/src/pages/Agendar.jsx:211

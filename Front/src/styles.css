@@ -1043,3 +1043,172 @@ h1, h2, h3, h4 {
   align-items: center !important;
   gap: 4px !important;
 }
+
+/* Public pages */
+.booking-hero {
+  margin: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(107, 127, 78, 0.16);
+  border-radius: 14px;
+  background: var(--pistache-claro);
+  box-shadow: var(--shadow);
+}
+.booking-hero-image {
+  display: block;
+  width: 100%;
+  height: clamp(120px, 34vw, 170px);
+  object-fit: cover;
+  object-position: center 48%;
+}
+.about-page {
+  min-height: 100vh;
+  background: var(--creme);
+}
+.app:has(.about-page) {
+  max-width: 960px;
+  background: var(--creme);
+}
+.about-page .header {
+  background: var(--branco-suave);
+}
+.about-back {
+  width: min(calc(100% - 32px), 920px);
+  margin: 0 auto;
+  padding: 18px 0 10px;
+}
+.about-back a {
+  color: var(--oliva-escuro);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.about-back a:hover { text-decoration: underline; }
+.about-content {
+  width: min(calc(100% - 32px), 920px);
+  margin: 0 auto;
+  padding-bottom: 36px;
+}
+.about-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.9fr);
+  align-items: center;
+  gap: clamp(20px, 4vw, 36px);
+  padding: 16px 0 28px;
+}
+.about-copy p {
+  margin-top: 12px;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.about-title,
+.about-section-title {
+  color: var(--oliva-escuro);
+  font-size: clamp(21px, 3vw, 28px);
+  font-weight: 600;
+}
+.about-image {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  max-height: 300px;
+  border: 1px solid rgba(107, 127, 78, 0.16);
+  border-radius: 18px;
+  background: var(--pistache-claro);
+  box-shadow: var(--shadow);
+  object-fit: cover;
+}
+.about-hours {
+  padding: 22px clamp(16px, 3vw, 28px);
+  border: 1px solid rgba(107, 127, 78, 0.14);
+  border-radius: 16px;
+  background: var(--branco-suave);
+  box-shadow: 0 4px 18px rgba(107, 127, 78, 0.07);
+}
+.about-section-title {
+  margin-bottom: 12px;
+  font-size: clamp(19px, 2.5vw, 23px);
+}
+.about-hours-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(126, 184, 168, 0.24);
+  color: var(--text-soft);
+  font-size: 14px;
+}
+.about-hours-row:last-child { border-bottom: 0; }
+.about-hours-row span:last-child {
+  color: var(--text-dark);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.about-contact { padding: 28px 0 8px; }
+.about-contact-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid rgba(107, 127, 78, 0.14);
+  border-radius: 14px;
+  background: var(--branco-suave);
+  box-shadow: 0 3px 12px rgba(107, 127, 78, 0.06);
+  color: var(--text-dark);
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.about-contact-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(107, 127, 78, 0.12);
+}
+.about-contact-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--pistache-claro);
+  font-size: 18px;
+}
+.about-contact-copy { display: grid; min-width: 0; gap: 3px; }
+.about-contact-label { color: var(--text-soft); font-size: 12px; }
+.about-contact-value {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  font-weight: 600;
+}
+.about-whatsapp .about-contact-icon { background: #e8f5e9; }
+.about-address .about-contact-icon { background: var(--verde-agua-claro); }
+.about-map-link {
+  margin-left: auto;
+  color: var(--oliva-escuro);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.about-cta { padding: 20px 0 0; }
+.about-cta a {
+  display: block;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--oliva-escuro);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.18s ease;
+}
+.about-cta a:hover { background: var(--oliva); }
+@media (max-width: 640px) {
+  .about-intro { grid-template-columns: 1fr; gap: 18px; padding-top: 10px; }
+  .about-image { min-height: 180px; max-height: 240px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .about-contact-card,
+  .about-cta a { transition-duration: 0.01ms; }
+}

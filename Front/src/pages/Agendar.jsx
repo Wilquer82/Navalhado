@@ -554,6 +554,17 @@ export default function Agendar() {
       </div>
 
       {step === 1 && (
+        <section className="booking-hero" aria-label="Ambiente de atendimento">
+          <img
+            className="booking-hero-image"
+            src="/home-massagem/booking-hero.jpg"
+            alt="Profissional realizando um atendimento em um ambiente acolhedor."
+            loading="eager"
+          />
+        </section>
+      )}
+
+      {step === 1 && (
         <>
           <div className="section-title">Escolha o profissional</div>
           {carregandoProfissionais ? (
